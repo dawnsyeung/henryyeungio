@@ -99,6 +99,16 @@ const songs = [
       audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3",
       accent: "linear-gradient(120deg, #ffafbd, #ffc3a0)",
     },
+      {
+        id: "rock-06",
+        title: "Eye of the Tiger",
+        artist: "Survivor",
+        genre: "rock",
+        mood: "Classic arena rock",
+        description: "Punchy riffs and a driving beat built for training montages.",
+        audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3",
+        accent: "linear-gradient(120deg, #f7971e, #ffd200)",
+      },
 ];
 
 const gridEl = document.getElementById("music-grid");
