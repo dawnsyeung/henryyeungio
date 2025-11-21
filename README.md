@@ -1,6 +1,6 @@
-# Pop & Rock Jukebox
+# Pop, Rock & Classical Jukebox
 
-Simple static web experience for sampling curated pop and rock tracks. Built with vanilla HTML/CSS/JS, no build step required.
+Simple static web experience for sampling curated pop, rock, and classical tracks. Built with vanilla HTML/CSS/JS, no build step required.
 
 ## Getting Started
 
@@ -12,9 +12,9 @@ Simple static web experience for sampling curated pop and rock tracks. Built wit
    # option B: open file directly (double-click index.html)
    ```
 2. Navigate to the served URL (default `http://localhost:4173`) or the opened file.
-3. Use the pill filters to switch between all, pop, and rock tracks. Each card includes a short description plus an audio preview sourced from SoundHelix examples.
+3. Use the pill filters to switch between all, pop, rock, and classical tracks. Each card includes a short description plus an audio preview sourced from SoundHelix examples.
 
 ## Customizing
 
-- Add more songs by editing `songs` in `app.js`.
+- Add more songs by editing `songs` in `app.js`. Genres automatically gain filters when you add matching buttons in `index.html`.
 - Adjust the visual theme via CSS variables in `styles.css`.
