@@ -49,16 +49,26 @@ const songs = [
     audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
     accent: "linear-gradient(120deg, #f5576c, #f093fb)",
   },
-  {
-    id: "rock-03",
-    title: "Voltage Bloom",
-    artist: "Satellite Riot",
-    genre: "rock",
-    mood: "Alt-grunge",
-    description: "Fuzzy riffs and tight grooves inspired by late-90s power trios.",
-    audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
-    accent: "linear-gradient(120deg, #1d976c, #93f9b9)",
-  },
+    {
+      id: "rock-03",
+      title: "Voltage Bloom",
+      artist: "Satellite Riot",
+      genre: "rock",
+      mood: "Alt-grunge",
+      description: "Fuzzy riffs and tight grooves inspired by late-90s power trios.",
+      audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
+      accent: "linear-gradient(120deg, #1d976c, #93f9b9)",
+    },
+    {
+      id: "rock-04",
+      title: "Eye of the Tiger",
+      artist: "Survivor",
+      genre: "rock",
+      mood: "Power anthem",
+      description: "Iconic riff-driven motivation from Rocky III, custom sample preview.",
+      audio: "https://samplelib.com/lib/preview/mp3/sample-6s.mp3",
+      accent: "linear-gradient(120deg, #ff9966, #ff5e62)",
+    },
 ];
 
 const gridEl = document.getElementById("music-grid");
