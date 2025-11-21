@@ -12,48 +12,57 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="app-shell">
-      <header class="panel hud">
-        <div>
-          <p class="eyebrow">Arcade Survival</p>
-          <h1>Gun Swap Arena</h1>
-          <p>Survive onslaughts with 10 lives. Every eliminaton swaps your weapon.</p>
-        </div>
-        <div class="stats">
-          <div class="stat">
-            <p class="label">Lives</p>
-            <p id="lives" class="value">10</p>
+      <div class="app-shell">
+        <header class="panel hud">
+          <div>
+            <p class="eyebrow">Arcade Survival</p>
+            <h1>Gun Swap Arena</h1>
+            <p>First-person survival — stay alive in 3D, swap guns every kill, and keep the horde at bay.</p>
           </div>
-          <div class="stat">
-            <p class="label">Kills</p>
-            <p id="kills" class="value">0</p>
+          <div class="stats">
+            <div class="stat">
+              <p class="label">Lives</p>
+              <p id="lives" class="value">10</p>
+            </div>
+            <div class="stat">
+              <p class="label">Kills</p>
+              <p id="kills" class="value">0</p>
+            </div>
+            <div class="stat">
+              <p class="label">Current Gun</p>
+              <p id="gun" class="value gun-name">Starter Pistol</p>
+            </div>
           </div>
-          <div class="stat">
-            <p class="label">Current Gun</p>
-            <p id="gun" class="value gun-name">Starter Pistol</p>
-          </div>
-        </div>
-      </header>
+        </header>
 
-      <main class="arena panel">
-        <canvas id="game-canvas" width="960" height="600" aria-label="Gun Swap Arena"></canvas>
-        <button id="reset-btn" class="reset" type="button">Restart Run</button>
-      </main>
+        <main class="arena panel">
+          <div id="game-root" class="game-root" aria-label="Gun Swap Arena 3D" role="application"></div>
+          <div id="crosshair" aria-hidden="true">
+            <span></span>
+            <span></span>
+          </div>
+          <div id="game-overlay" class="game-overlay hidden" aria-live="polite">
+            <h3>Run Over</h3>
+            <p class="final-kills">Final Kills: <span id="final-kills">0</span></p>
+            <p>Press restart or click the arena to dive back in.</p>
+          </div>
+          <button id="reset-btn" class="reset" type="button">Restart Run</button>
+        </main>
 
-      <section class="panel instructions">
-        <h2>How to Play</h2>
-        <ul>
-          <li>WASD or arrow keys to move. Aim with the mouse and left-click to fire.</li>
-          <li>Every enemy takedown instantly equips a randomly rolled gun with unique stats.</li>
-          <li>You start with 10 lives. Colliding with an enemy costs one life.</li>
-          <li>Keep killing to climb the leaderboard UI and chase your longest survival streak.</li>
-        </ul>
-        <p class="hint">
-          Pro tip: Some guns fire slower but hit harder. Others spray fast but deal less per shot.
-          Adapt fast!
-        </p>
-      </section>
-    </div>
+        <section class="panel instructions">
+          <h2>How to Play</h2>
+          <ul>
+            <li>Click anywhere on the arena to lock the pointer and enter the visor.</li>
+            <li>WASD (or arrow keys) move you. Move the mouse to look around, left-click to fire.</li>
+            <li>Every enemy takedown instantly equips a new gun archetype with its own stats.</li>
+            <li>You start with 10 lives. Letting a drone touch you costs one life.</li>
+            <li>Press Esc to release pointer lock anytime.</li>
+          </ul>
+          <p class="hint">
+            Pro tip: Spray weapons track fast movers, while slow cannons delete tougher drones. Swap styles on the fly!
+          </p>
+        </section>
+      </div>
 
     <script src="./app.js" type="module"></script>
   </body>
