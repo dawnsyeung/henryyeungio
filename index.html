@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pop & Rock Jukebox</title>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero__glass">
+        <p class="hero__eyebrow">Genre Hub</p>
+        <h1>Pop & Rock Jukebox</h1>
+        <p>
+          Discover curated pop and rock tracks. Sample the vibe, learn about the
+          artists, and build the perfect energy for your next session.
+        </p>
+        <div class="controls">
+          <button class="pill pill--active" data-filter="all">All</button>
+          <button class="pill" data-filter="pop">Pop</button>
+          <button class="pill" data-filter="rock">Rock</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="grid" id="music-grid"></section>
+    </main>
+
+    <template id="card-template">
+      <article class="card">
+        <div class="card__badge"></div>
+        <div class="card__body">
+          <div>
+            <p class="card__genre"></p>
+            <h2 class="card__title"></h2>
+            <p class="card__artist"></p>
+            <p class="card__description"></p>
+          </div>
+          <audio controls preload="none" class="card__audio">
+            <source />
+            Your browser does not support the audio element.
+          </audio>
+        </div>
+      </article>
+    </template>
+
+    <footer>
+      <small>Built with ❤️ for music lovers.</small>
+    </footer>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>
