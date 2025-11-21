@@ -99,6 +99,16 @@ const songs = [
       audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3",
       accent: "linear-gradient(120deg, #ffafbd, #ffc3a0)",
     },
+      {
+        id: "rock-06",
+        title: "Eye of the Tiger",
+        artist: "Survivor",
+        genre: "rock",
+        mood: "Arena rock",
+        description: "Punchy riffs and a relentless groove that defined 80s motivation anthems.",
+        audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3",
+        accent: "linear-gradient(120deg, #f83600, #fe8c00)",
+      },
     {
       id: "classical-01",
       title: "Dawn Adagio",
