@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pop, Rock & Classical Jukebox</title>
+    <title>Gun Swap Arena</title>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap"
@@ -12,48 +12,48 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header class="hero">
-      <div class="hero__glass">
-        <p class="hero__eyebrow">Genre Hub</p>
-        <h1>Pop, Rock & Classical Jukebox</h1>
-        <p>
-          Discover curated pop, rock, and classical tracks. Sample the vibe, learn about
-          the artists, and build the perfect energy for your next session.
-        </p>
-        <div class="controls">
-          <button class="pill pill--active" data-filter="all">All</button>
-          <button class="pill" data-filter="pop">Pop</button>
-          <button class="pill" data-filter="rock">Rock</button>
-          <button class="pill" data-filter="classical">Classical</button>
+    <div class="app-shell">
+      <header class="panel hud">
+        <div>
+          <p class="eyebrow">Arcade Survival</p>
+          <h1>Gun Swap Arena</h1>
+          <p>Survive onslaughts with 10 lives. Every eliminaton swaps your weapon.</p>
         </div>
-      </div>
-    </header>
-
-    <main>
-      <section class="grid" id="music-grid"></section>
-    </main>
-
-    <template id="card-template">
-      <article class="card">
-        <div class="card__badge"></div>
-        <div class="card__body">
-          <div>
-            <p class="card__genre"></p>
-            <h2 class="card__title"></h2>
-            <p class="card__artist"></p>
-            <p class="card__description"></p>
+        <div class="stats">
+          <div class="stat">
+            <p class="label">Lives</p>
+            <p id="lives" class="value">10</p>
           </div>
-          <audio controls preload="none" class="card__audio">
-            <source />
-            Your browser does not support the audio element.
-          </audio>
+          <div class="stat">
+            <p class="label">Kills</p>
+            <p id="kills" class="value">0</p>
+          </div>
+          <div class="stat">
+            <p class="label">Current Gun</p>
+            <p id="gun" class="value gun-name">Starter Pistol</p>
+          </div>
         </div>
-      </article>
-    </template>
+      </header>
 
-    <footer>
-      <small>Built with ❤️ for music lovers.</small>
-    </footer>
+      <main class="arena panel">
+        <canvas id="game-canvas" width="960" height="600" aria-label="Gun Swap Arena"></canvas>
+        <button id="reset-btn" class="reset" type="button">Restart Run</button>
+      </main>
+
+      <section class="panel instructions">
+        <h2>How to Play</h2>
+        <ul>
+          <li>WASD or arrow keys to move. Aim with the mouse and left-click to fire.</li>
+          <li>Every enemy takedown instantly equips a randomly rolled gun with unique stats.</li>
+          <li>You start with 10 lives. Colliding with an enemy costs one life.</li>
+          <li>Keep killing to climb the leaderboard UI and chase your longest survival streak.</li>
+        </ul>
+        <p class="hint">
+          Pro tip: Some guns fire slower but hit harder. Others spray fast but deal less per shot.
+          Adapt fast!
+        </p>
+      </section>
+    </div>
 
     <script src="./app.js" type="module"></script>
   </body>

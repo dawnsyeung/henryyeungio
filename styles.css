@@ -1,16 +1,19 @@
 :root {
   color-scheme: dark;
   font-family: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --bg: radial-gradient(circle at top, #211751, #06060f 60%);
-  --glass: rgba(255, 255, 255, 0.08);
+  --bg: radial-gradient(circle at top, #160b2c, #040109 60%);
+  --panel: rgba(14, 11, 26, 0.85);
   --border: rgba(255, 255, 255, 0.15);
-  --text: #f5f5f7;
-  --muted: rgba(245, 245, 247, 0.7);
-  --accent-pop: #ff69b4;
-  --accent-rock: #4dd0e1;
+  --text: #f8f8fb;
+  --muted: rgba(248, 248, 251, 0.7);
+  --highlight: #8e66ff;
+  --danger: #ff5b91;
+  --success: #79ffe1;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -20,149 +23,163 @@ body {
   background-image: var(--bg);
   color: var(--text);
   display: flex;
+  justify-content: center;
+  padding: clamp(1.5rem, 2vw, 3rem);
+}
+
+.app-shell {
+  width: min(1200px, 100%);
+  display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 2rem clamp(1.5rem, 3vw, 4rem);
-  gap: 2rem;
+  gap: 1.75rem;
 }
 
-.hero {
-  width: min(900px, 100%);
-}
-
-.hero__glass {
+.panel {
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 28px;
   padding: clamp(1.5rem, 3vw, 2.5rem);
-  background: linear-gradient(120deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-  backdrop-filter: blur(12px);
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(16px);
 }
 
-.hero__eyebrow {
+.hud {
+  display: flex;
+  justify-content: space-between;
+  gap: clamp(1rem, 3vw, 2rem);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.eyebrow {
   text-transform: uppercase;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.2em;
+  font-size: 0.75rem;
   color: var(--muted);
-  font-size: 0.85rem;
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.4rem;
 }
 
 h1 {
-  font-size: clamp(2.2rem, 4vw, 3.5rem);
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.5rem;
+  font-size: clamp(2rem, 4vw, 3.25rem);
 }
 
-.hero p {
-  margin: 0 0 1.5rem;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.pill {
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text);
-  padding: 0.6rem 1.5rem;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
-}
-
-.pill--active {
-  border-color: rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.15);
-}
-
-main {
-  width: min(1100px, 100%);
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.5rem;
-}
-
-.card {
-  border: 1px solid var(--border);
-  border-radius: 1.5rem;
-  padding: 1.25rem;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(8px);
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  position: relative;
-  overflow: hidden;
-}
-
-.card__badge {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.15), transparent 60%);
-  pointer-events: none;
-}
-
-.card__body {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
-}
-
-.card__genre {
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  font-size: 0.8rem;
-  color: var(--muted);
-  margin: 0;
-}
-
-.card__title {
-  margin: 0.1rem 0 0.25rem;
-}
-
-.card__artist {
+.hud p {
   margin: 0;
   color: var(--muted);
-  font-weight: 600;
-}
-
-.card__description {
-  margin: 0;
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.75);
   line-height: 1.4;
 }
 
-.card__audio {
-  width: 100%;
+.stats {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
 }
 
-audio::-webkit-media-controls-panel {
-  background-color: rgba(255, 255, 255, 0.1);
+.stat {
+  min-width: 120px;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.04);
 }
 
-footer {
+.stat .label {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
   color: var(--muted);
-  font-size: 0.85rem;
-  padding-bottom: 1rem;
+  margin: 0 0 0.35rem;
 }
 
-@media (max-width: 600px) {
-  body {
-    padding: 1.5rem;
+.stat .value {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+.gun-name {
+  font-size: 1.1rem;
+  color: var(--highlight);
+}
+
+.arena {
+  position: relative;
+  padding: 2rem;
+}
+
+canvas {
+  width: 100%;
+  height: auto;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #02030b;
+  cursor: crosshair;
+}
+
+.reset {
+  position: absolute;
+  bottom: 2rem;
+  right: 2rem;
+  padding: 0.65rem 1.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.reset:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.instructions h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.5rem;
+}
+
+.instructions ul {
+  margin: 0 0 1rem;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.instructions li {
+  margin-bottom: 0.5rem;
+}
+
+.hint {
+  margin: 0;
+  color: var(--success);
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .panel {
+    padding: 1.25rem;
   }
 
-  .card {
+  .stats {
+    width: 100%;
+  }
+
+  .stat {
+    flex: 1 1 120px;
+  }
+
+  .arena {
     padding: 1rem;
+  }
+
+  .reset {
+    position: static;
+    margin-top: 1rem;
+    width: 100%;
+    text-align: center;
   }
 }
