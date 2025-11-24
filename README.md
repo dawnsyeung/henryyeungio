@@ -18,9 +18,11 @@ An endless, canvas-rendered parkour runner. Sprint across floating voxels, queue
 - Momentum meter that translates directly into larger jumps and spacing.
 - Coyote time (~0.12s) and jump buffering for responsive inputs, plus dust FX on landings.
 - Local best distance stored automatically so you can chase PBs between sessions.
+- Checkpoint flags drop every ~250m; each banked flag grants a single rewind to that spot before the run truly ends.
 
 ## Customizing
 
 - Tune gravity, jump force, speed ramp, or particle behavior in `config` within `app.js`.
+- Adjust checkpoint spacing, toast durations, or respawn flash timing via the same config block.
 - Adjust generation rules inside `ensurePlatforms` if you want taller peaks or wider gaps.
 - Style the HUD and track colors by editing CSS variables in `styles.css` or the `draw*` helpers in `app.js`.

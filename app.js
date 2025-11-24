@@ -3,6 +3,7 @@ const ctx = canvas?.getContext("2d");
 const distanceEl = document.getElementById("distance");
 const bestEl = document.getElementById("best");
 const paceEl = document.getElementById("pace");
+const checkpointEl = document.getElementById("checkpoint");
 const resetBtn = document.getElementById("reset-btn");
 const pauseBtn = document.getElementById("pause-btn");
 const bestStorageKey = "blockstep-best";
@@ -16,6 +17,9 @@ const config = {
   jumpBuffer: 0.16,
   platformHeight: 56,
   trailInterval: 0.08,
+  checkpointInterval: 250,
+  checkpointToastDuration: 2.5,
+  respawnFlashDuration: 0.6,
 };
 
 const state = {
@@ -35,6 +39,15 @@ const state = {
   startX: 0,
   speed: config.baseSpeed,
   trailTimer: 0,
+  checkpoints: [],
+  checkpointCounter: 0,
+  nextCheckpointDistance: 0,
+  lastUnlockedCheckpointDistance: null,
+  checkpointToastTimer: 0,
+  checkpointToastText: "",
+  respawnFlashTimer: 0,
+  lastGroundPlatform: null,
+  maxDistanceThisRun: 0,
 };
 
 function loadBestDistance() {
@@ -97,6 +110,15 @@ function resetGame() {
   state.paused = false;
   state.lastTime = 0;
   state.speed = config.baseSpeed;
+  state.checkpoints = [];
+  state.checkpointCounter = 0;
+  state.nextCheckpointDistance = config.checkpointInterval;
+  state.lastUnlockedCheckpointDistance = null;
+  state.checkpointToastTimer = 0;
+  state.checkpointToastText = "";
+  state.respawnFlashTimer = 0;
+  state.lastGroundPlatform = null;
+  state.maxDistanceThisRun = 0;
   seedWorld();
   updateHud();
   setPauseLabel();
@@ -127,7 +149,12 @@ function ensurePlatforms() {
 
 function cullPlatforms() {
   const cutoff = state.cameraX - 400;
-  state.platforms = state.platforms.filter((platform) => platform.x + platform.width > cutoff);
+  state.platforms = state.platforms.filter((platform) => {
+    if (platform.checkpointReferences && platform.checkpointReferences > 0) {
+      return true;
+    }
+    return platform.x + platform.width > cutoff;
+  });
 }
 
 function update(timestamp) {
@@ -173,16 +200,21 @@ function updateGame(dt) {
   cullPlatforms();
 
   state.distance = Math.max(0, Math.floor((player.x - state.startX) / 8));
+  state.maxDistanceThisRun = Math.max(state.maxDistanceThisRun, state.distance);
+  maybePlaceCheckpoint();
   state.trailTimer += dt;
   if (state.onGround && state.trailTimer >= config.trailInterval) {
     spawnTrailDust();
     state.trailTimer = 0;
   }
 
+  updateCheckpointTimers(dt);
   updateParticles(dt);
 
   if (player.y > canvas.height + 260) {
-    endRun();
+    if (!tryRespawnFromCheckpoint()) {
+      endRun();
+    }
   }
   updateHud();
 }
@@ -191,6 +223,7 @@ function handleCollisions(prevY) {
   const player = state.player;
   const wasGrounded = state.onGround;
   state.onGround = false;
+  state.lastGroundPlatform = null;
 
   const prevBottom = prevY + player.height;
   const bottom = player.y + player.height;
@@ -203,11 +236,95 @@ function handleCollisions(prevY) {
       player.vy = 0;
       state.onGround = true;
       state.jumpGrace = config.coyoteTime;
+      state.lastGroundPlatform = platform;
       if (!wasGrounded) {
         emitLandingDust(player.x + player.width / 2, platformTop);
       }
       break;
     }
+  }
+}
+
+function maybePlaceCheckpoint() {
+  if (!state.onGround) return;
+  if (!state.lastGroundPlatform) return;
+  if (state.distance < state.nextCheckpointDistance) return;
+  createCheckpoint(state.lastGroundPlatform);
+}
+
+function createCheckpoint(platform) {
+  state.checkpointCounter += 1;
+  const checkpoint = {
+    id: state.checkpointCounter,
+    x: platform.x + platform.width / 2,
+    y: platform.y,
+    distance: state.distance,
+    platform,
+  };
+  platform.checkpointReferences = (platform.checkpointReferences || 0) + 1;
+  state.checkpoints.push(checkpoint);
+  state.nextCheckpointDistance += config.checkpointInterval;
+  state.lastUnlockedCheckpointDistance = checkpoint.distance;
+  state.checkpointToastText = `Checkpoint ${state.checkpoints.length} • ${checkpoint.distance}m`;
+  state.checkpointToastTimer = config.checkpointToastDuration;
+  emitCheckpointBeacon(checkpoint);
+}
+
+function emitCheckpointBeacon(checkpoint) {
+  for (let i = 0; i < 18; i += 1) {
+    const angle = randomRange(Math.PI, 2 * Math.PI);
+    const speed = randomRange(140, 240);
+    state.particles.push({
+      x: checkpoint.x,
+      y: checkpoint.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed * 0.5,
+      life: 0,
+      maxLife: randomRange(0.35, 0.55),
+      color: "rgba(255, 184, 108, 0.65)",
+      size: randomRange(2, 4),
+    });
+  }
+}
+
+function tryRespawnFromCheckpoint() {
+  if (!state.checkpoints.length) {
+    return false;
+  }
+  const checkpoint = state.checkpoints.pop();
+  if (checkpoint?.platform && checkpoint.platform.checkpointReferences) {
+    checkpoint.platform.checkpointReferences = Math.max(0, checkpoint.platform.checkpointReferences - 1);
+  }
+  state.checkpointToastText = `Respawned • ${checkpoint.distance}m`;
+  state.checkpointToastTimer = Math.max(state.checkpointToastTimer, 1.4);
+  respawnAt(checkpoint);
+  return true;
+}
+
+function respawnAt(checkpoint) {
+  const player = state.player;
+  player.x = checkpoint.x - player.width / 2;
+  player.y = checkpoint.y - player.height;
+  player.vy = 0;
+  state.cameraX = Math.max(0, player.x - 320);
+  state.jumpGrace = config.coyoteTime;
+  state.jumpBufferTimer = 0;
+  state.onGround = true;
+  state.trailTimer = 0;
+  state.speed = config.baseSpeed;
+  state.respawnFlashTimer = config.respawnFlashDuration;
+  state.lastGroundPlatform = checkpoint.platform ?? null;
+  state.distance = Math.max(0, Math.floor((player.x - state.startX) / 8));
+  ensurePlatforms();
+  cullPlatforms();
+}
+
+function updateCheckpointTimers(dt) {
+  if (state.checkpointToastTimer > 0) {
+    state.checkpointToastTimer = Math.max(0, state.checkpointToastTimer - dt);
+  }
+  if (state.respawnFlashTimer > 0) {
+    state.respawnFlashTimer = Math.max(0, state.respawnFlashTimer - dt);
   }
 }
 
@@ -234,8 +351,11 @@ function performJump() {
 
 function endRun() {
   state.isRunning = false;
-  if (state.distance > state.bestDistance) {
-    state.bestDistance = state.distance;
+  const runDistance = Math.max(state.distance, state.maxDistanceThisRun);
+  state.distance = runDistance;
+  state.maxDistanceThisRun = runDistance;
+  if (runDistance > state.bestDistance) {
+    state.bestDistance = runDistance;
     saveBestDistance();
   }
   updateHud();
@@ -299,6 +419,17 @@ function updateHud() {
     const blocksPerSecond = (state.speed / 60).toFixed(1);
     paceEl.textContent = `${blocksPerSecond} b/s`;
   }
+  if (checkpointEl) {
+    if (state.lastUnlockedCheckpointDistance === null) {
+      checkpointEl.textContent = `Next @ ${state.nextCheckpointDistance}m`;
+    } else if (state.checkpoints.length > 0) {
+      const banked = state.checkpoints.length;
+      const label = banked === 1 ? "charge" : "charges";
+      checkpointEl.textContent = `${state.lastUnlockedCheckpointDistance}m • ${banked} ${label}`;
+    } else {
+      checkpointEl.textContent = `${state.lastUnlockedCheckpointDistance}m • spent`;
+    }
+  }
 }
 
 function render(time = 0) {
@@ -306,15 +437,18 @@ function render(time = 0) {
   drawBackground(time);
   drawParallax(time);
   drawPlatforms();
+  drawCheckpoints(time);
   drawParticles();
   drawPlayer(time);
   drawSpeedBar();
+  drawCheckpointToast();
 
   if (!state.isRunning) {
     drawOverlay("Run Over", "Press R or Reset Run to try again");
   } else if (state.paused) {
     drawOverlay("Paused", "Press P or Resume to keep running");
   }
+  drawRespawnFlash();
 }
 
 function drawBackground(time) {
@@ -365,6 +499,30 @@ function drawPlatforms() {
     ctx.fillRect(screenX, screenY, platform.width, platform.height);
     ctx.fillStyle = "rgba(255,255,255,0.08)";
     ctx.fillRect(screenX, screenY, platform.width, 4);
+  }
+  ctx.restore();
+}
+
+function drawCheckpoints(time) {
+  if (!state.checkpoints.length) return;
+  ctx.save();
+  for (const checkpoint of state.checkpoints) {
+    const screenX = checkpoint.x - state.cameraX;
+    if (screenX < -80 || screenX > canvas.width + 80) continue;
+    const poleHeight = 46;
+    const pulse = 0.5 + Math.sin((time + checkpoint.id * 32) * 0.008) * 0.25;
+    const topY = checkpoint.y - poleHeight;
+    ctx.fillStyle = `rgba(255, 188, 110, ${0.35 + pulse * 0.2})`;
+    ctx.fillRect(screenX - 3, topY, 6, poleHeight);
+    ctx.fillStyle = `rgba(255, 138, 92, ${0.6 + pulse * 0.2})`;
+    ctx.beginPath();
+    ctx.moveTo(screenX + 3, topY + 6);
+    ctx.lineTo(screenX + 32, topY + 14);
+    ctx.lineTo(screenX + 3, topY + 22);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.fillRect(screenX - 16, checkpoint.y - 4, 32, 4);
   }
   ctx.restore();
 }
@@ -424,6 +582,44 @@ function drawSpeedBar() {
   ctx.strokeStyle = "rgba(255,255,255,0.4)";
   ctx.lineWidth = 1;
   ctx.strokeRect(x, y, barWidth, barHeight);
+  ctx.restore();
+}
+
+function drawCheckpointToast() {
+  if (state.checkpointToastTimer <= 0 || !state.checkpointToastText) return;
+  const life = state.checkpointToastTimer / config.checkpointToastDuration;
+  const fadeIn = clamp(1 - Math.max(0, life - 0.6) / 0.4, 0, 1);
+  const alpha = clamp(Math.min(life * 1.1, fadeIn), 0, 1);
+  if (alpha <= 0) return;
+  const text = state.checkpointToastText;
+  ctx.save();
+  ctx.font = "600 20px Montserrat, sans-serif";
+  const metrics = ctx.measureText(text);
+  const paddingX = 22;
+  const paddingY = 14;
+  const width = metrics.width + paddingX * 2;
+  const height = 44;
+  const x = (canvas.width - width) / 2;
+  const y = 28;
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "rgba(6, 18, 28, 0.85)";
+  ctx.fillRect(x, y, width, height);
+  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
+  ctx.fillStyle = "#ffdca3";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, canvas.width / 2, y + height / 2);
+  ctx.restore();
+}
+
+function drawRespawnFlash() {
+  if (state.respawnFlashTimer <= 0) return;
+  const alpha = clamp(state.respawnFlashTimer / config.respawnFlashDuration, 0, 1);
+  ctx.save();
+  ctx.fillStyle = `rgba(255,255,255,${alpha * 0.6})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
 }
 
