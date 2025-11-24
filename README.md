@@ -1,28 +1,26 @@
-# Evergreen Glow
+# Blockstep Parkour
 
-An interactive Christmas tree decorating game built with vanilla HTML, CSS, and JavaScript. Scatter ornaments, dial in the twinkle, flip the snowfall on or off, and chase your best festive score.
+An endless, canvas-rendered parkour runner. Sprint across floating voxels, queue jumps before you leave a block, and keep your speed meter climbing to survive longer gaps.
 
 ## Getting Started
 
-1. Serve the directory or open `index.html` directly in your browser.
+1. Serve the directory or open `index.html` in your browser.
    ```bash
    python -m http.server 4173
    ```
-2. The runner auto-moves. Focus on jump timing: press Space, W, or the Up Arrow.
-3. Queue jumps before you leave an edge — buffered jumps trigger on the next frame you can jump.
-4. Falling beneath the islands ends the run. Click restart or tap R to reset instantly.
-2. Click anywhere on the tree to place the currently selected ornament.
-3. Use the palette on the right to swap ornament styles, adjust the light twinkle slider, pause snowfall, or trigger a Surprise Sparkle.
-4. Use **Undo Ornament** to step back or **Reset Tree** to clear everything.
+2. The runner auto-moves. Press **Space**, **W**, **Up Arrow**, or tap the canvas to jump.
+3. Hold the jump key to buffer the next jump — it fires on the first frame you can leave the ground.
+4. Press **R** or the Reset Run button to restart instantly. Use **P**/Pause to freeze the action.
 
 ## Features
 
-- Starts are gentle: long platforms with short gaps. Distance increases speed and gap sizes.
-- Landings refresh your jump window. Leaving a block grants ~0.12s of coyote time for forgiving inputs.
-- The HUD tracks current distance, best run, and momentum (blocks per second).
+- Procedurally generated platforms with subtle height variance and escalating gaps.
+- Momentum meter that translates directly into larger jumps and spacing.
+- Coyote time (~0.12s) and jump buffering for responsive inputs, plus dust FX on landings.
+- Local best distance stored automatically so you can chase PBs between sessions.
 
 ## Customizing
 
-- Tweak gravity, jump force, and speed ramps inside `config` in `app.js`.
-- Adjust platform frequency/height via `ensurePlatforms` and `createPlatform`.
-- Theme the UI and islands by editing CSS variables and canvas drawing colors in `styles.css` / `app.js`.
+- Tune gravity, jump force, speed ramp, or particle behavior in `config` within `app.js`.
+- Adjust generation rules inside `ensurePlatforms` if you want taller peaks or wider gaps.
+- Style the HUD and track colors by editing CSS variables in `styles.css` or the `draw*` helpers in `app.js`.
