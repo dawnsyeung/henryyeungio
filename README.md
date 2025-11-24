@@ -1,27 +1,26 @@
-# Gun Swap Arena
+# Evergreen Glow
 
-A tiny top-down browser shooter built with vanilla HTML, CSS, and JavaScript. Survive waves of enemies with 10 lives — every kill instantly swaps your gun to a new archetype with different fire rates, spreads, and damage.
+An interactive Christmas tree decorating game built with vanilla HTML, CSS, and JavaScript. Scatter ornaments, dial in the twinkle, flip the snowfall on or off, and chase your best festive score.
 
 ## Getting Started
 
 1. Serve the directory or open `index.html` directly in your browser.
    ```bash
-   # optional local server
    python -m http.server 4173
    ```
-2. Move with WASD or the arrow keys.
-3. Aim with the mouse and hold the left button to fire.
-4. Colliding with an enemy costs one life. When you hit zero, the run ends — use the restart button to jump back in.
+2. Click anywhere on the tree to place the currently selected ornament.
+3. Use the palette on the right to swap ornament styles, adjust the light twinkle slider, pause snowfall, or trigger a Surprise Sparkle.
+4. Use **Undo Ornament** to step back or **Reset Tree** to clear everything.
 
-## Gameplay Details
+## Features
 
-- You always begin with 10 lives and the Starter Pistol.
-- Enemy spawns accelerate as your kill count rises.
-- Gun order cycles with each kill, so plan around fast SMG bursts, high-damage slugs, shotguns, and more.
-- The HUD at the top keeps track of remaining lives, total kills, and your currently equipped weapon.
+- **Five ornament archetypes** (glass, frosted, bell, candy, star) each with unique artwork and scoring values.
+- **Festive score tracker** that rewards variety, balance, and fullness.
+- **Animated scene** complete with twinkling garlands, snowfall, and a glowing tree topper.
+- **Accessibility-friendly controls** — everything runs client-side with no dependencies.
 
 ## Customizing
 
-- Edit the `guns` array in `app.js` to tweak fire rates, damage, spread, color, or pellet count.
-- Adjust spawn pacing via `maybeTightenSpawn` and the `spawnEnemy` helper.
-- Update the neon-inspired theme by tweaking CSS variables in `styles.css`.
+- Adjust ornament colors, sizes, or scores inside the `ornamentCatalog` in `app.js`.
+- Tweak tree colors, typography, or layout in `styles.css`.
+- Modify the scoring logic inside `calculateScore` to match your own vibe-based grading rubric.

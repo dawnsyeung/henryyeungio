@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gun Swap Arena</title>
+    <title>Evergreen Glow · Christmas Tree Decorating Game</title>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap"
@@ -13,46 +13,103 @@
   </head>
   <body>
     <div class="app-shell">
-      <header class="panel hud">
+      <header class="panel hero">
         <div>
-          <p class="eyebrow">Arcade Survival</p>
-          <h1>Gun Swap Arena</h1>
-          <p>Survive onslaughts with 10 lives. Every eliminaton swaps your weapon.</p>
+          <p class="eyebrow">Cozy Creative Mode</p>
+          <h1>Evergreen Glow</h1>
+          <p>
+            Craft the coziest Christmas tree on the block. Pick ornaments, adjust the twinkle, and let
+            it snow while you chase the perfect festive score.
+          </p>
         </div>
         <div class="stats">
           <div class="stat">
-            <p class="label">Lives</p>
-            <p id="lives" class="value">10</p>
+            <p class="label">Ornaments</p>
+            <p id="ornament-count" class="value">0</p>
           </div>
           <div class="stat">
-            <p class="label">Kills</p>
-            <p id="kills" class="value">0</p>
+            <p class="label">Festive Score</p>
+            <p id="score-value" class="value">0</p>
           </div>
           <div class="stat">
-            <p class="label">Current Gun</p>
-            <p id="gun" class="value gun-name">Starter Pistol</p>
+            <p class="label">Selected</p>
+            <p id="selected-label" class="value gun-name">Glass Ornament</p>
           </div>
         </div>
       </header>
 
-      <main class="arena panel">
-        <canvas id="game-canvas" width="960" height="600" aria-label="Gun Swap Arena"></canvas>
-        <button id="reset-btn" class="reset" type="button">Restart Run</button>
-      </main>
+      <main class="play-area">
+        <section class="panel canvas-panel">
+          <div class="canvas-headline">
+            <div>
+              <h2>Your Tree</h2>
+              <p>Tap anywhere on the tree to place the selected decoration. Undo or reset anytime.</p>
+            </div>
+            <div class="canvas-actions">
+              <button id="undo-btn" type="button">Undo Ornament</button>
+              <button id="reset-btn" type="button" class="primary">Reset Tree</button>
+            </div>
+          </div>
+          <canvas id="tree-canvas" width="960" height="600" aria-label="Christmas tree builder"></canvas>
+        </section>
 
-      <section class="panel instructions">
-        <h2>How to Play</h2>
-        <ul>
-          <li>WASD or arrow keys to move. Aim with the mouse and left-click to fire.</li>
-          <li>Every enemy takedown instantly equips a randomly rolled gun with unique stats.</li>
-          <li>You start with 10 lives. Colliding with an enemy costs one life.</li>
-          <li>Keep killing to climb the leaderboard UI and chase your longest survival streak.</li>
-        </ul>
-        <p class="hint">
-          Pro tip: Some guns fire slower but hit harder. Others spray fast but deal less per shot.
-          Adapt fast!
-        </p>
-      </section>
+        <section class="panel controls">
+          <div class="controls-head">
+            <h2>Decoration Kit</h2>
+            <p>Choose a style, tweak the twinkle, and let the snowfall set the mood.</p>
+          </div>
+          <div id="palette" class="palette" role="listbox" aria-label="Available ornaments">
+            <button class="palette-btn is-selected" data-type="classic" type="button">
+              <span class="icon">🔴</span>
+              <span class="label">Glass Ornament</span>
+            </button>
+            <button class="palette-btn" data-type="frost" type="button">
+              <span class="icon">❄️</span>
+              <span class="label">Frosted Flake</span>
+            </button>
+            <button class="palette-btn" data-type="bell" type="button">
+              <span class="icon">🔔</span>
+              <span class="label">Golden Bell</span>
+            </button>
+            <button class="palette-btn" data-type="candy" type="button">
+              <span class="icon">🍬</span>
+              <span class="label">Candy Drop</span>
+            </button>
+            <button class="palette-btn" data-type="star" type="button">
+              <span class="icon">⭐</span>
+              <span class="label">Spark Star</span>
+            </button>
+          </div>
+
+          <div class="control-row">
+            <label for="twinkle-range">Twinkle intensity</label>
+            <input
+              id="twinkle-range"
+              type="range"
+              min="20"
+              max="100"
+              value="70"
+              step="1"
+              aria-label="Adjust light twinkle"
+            />
+          </div>
+
+          <div class="toggles">
+            <button id="snow-toggle" class="toggle-btn" type="button">Pause Snowfall</button>
+            <button id="sparkle-btn" class="toggle-btn" type="button">Surprise Sparkle</button>
+          </div>
+
+          <div class="tips">
+            <h3>Tips</h3>
+            <ul>
+              <li>Balance both sides of the tree for bonus style points.</li>
+              <li>Mix at least three ornament types to unlock a magic boost.</li>
+              <li>The slider brightens the string lights — dim for calm, max for party mode.</li>
+              <li>Need inspiration? Hit Surprise Sparkle to scatter a few ornaments automatically.</li>
+            </ul>
+          </div>
+        </section>
+      </main>
     </div>
 
     <script src="./app.js" type="module"></script>
