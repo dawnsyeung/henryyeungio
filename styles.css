@@ -1,17 +1,13 @@
 :root {
   color-scheme: dark;
   font-family: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --forest: #0a3327;
-  --forest-dark: #071f1b;
-  --pine: #0f4f3c;
-  --cream: #fdf8f1;
-  --muted: #b6d3cf;
-  --accent: #ffbb6f;
-  --accent-strong: #ff6f91;
-  --panel: rgba(6, 18, 29, 0.75);
-  --panel-light: rgba(34, 53, 62, 0.45);
-  --border: rgba(255, 255, 255, 0.12);
-  --shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+  --bg: linear-gradient(180deg, #7cd0ff 0%, #a6e9ff 35%, #b0f0c4 100%);
+  --panel: rgba(14, 30, 41, 0.8);
+  --border: rgba(255, 255, 255, 0.2);
+  --text: #f6fffb;
+  --muted: rgba(246, 255, 251, 0.75);
+  --highlight: #7bff9b;
+  --accent: #ffb347;
 }
 
 *,
@@ -105,6 +101,8 @@ h1 {
 
 .gun-name {
   font-size: 1.1rem;
+  color: var(--highlight);
+  text-shadow: 0 0 12px rgba(123, 255, 155, 0.45);
   color: var(--accent);
 }
 
@@ -166,7 +164,8 @@ button {
   border-color: rgba(255, 255, 255, 0.25);
 }
 
-button:hover {
+.reset:hover {
+  background: rgba(30, 80, 60, 0.9);
   transform: translateY(-1px);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
 }
@@ -258,6 +257,8 @@ button.primary {
 
 .tips ul {
   margin: 0;
+  color: var(--highlight);
+  font-weight: 600;
   padding-left: 1.2rem;
   color: rgba(255, 255, 255, 0.75);
   line-height: 1.55;

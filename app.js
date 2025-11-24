@@ -1,226 +1,210 @@
 const canvas = document.getElementById("tree-canvas");
 const ctx = canvas.getContext("2d");
-
-const ornamentCountEl = document.getElementById("ornament-count");
-const scoreEl = document.getElementById("score-value");
-const selectedLabelEl = document.getElementById("selected-label");
-const twinkleRange = document.getElementById("twinkle-range");
-const palette = document.getElementById("palette");
-const paletteButtons = Array.from(document.querySelectorAll(".palette-btn"));
-const snowToggleBtn = document.getElementById("snow-toggle");
-const sparkleBtn = document.getElementById("sparkle-btn");
-const undoBtn = document.getElementById("undo-btn");
+const distanceEl = document.getElementById("distance");
+const bestEl = document.getElementById("best");
+const paceEl = document.getElementById("pace");
 const resetBtn = document.getElementById("reset-btn");
 
-const ornamentCatalog = {
-  classic: {
-    label: "Glass Ornament",
-    color: "#ff5c8d",
-    accent: "#ffdfe9",
-    score: 6,
-    size: 16,
-    shape: "round",
-  },
-  frost: {
-    label: "Frosted Flake",
-    color: "#d9f3ff",
-    accent: "#ffffff",
-    score: 7,
-    size: 14,
-    shape: "flake",
-  },
-  bell: {
-    label: "Golden Bell",
-    color: "#f5c75c",
-    accent: "#fff0c7",
-    score: 9,
-    size: 18,
-    shape: "bell",
-  },
-  candy: {
-    label: "Candy Drop",
-    color: "#ffad5c",
-    accent: "#ffe7c9",
-    score: 8,
-    size: 15,
-    shape: "drop",
-  },
-  star: {
-    label: "Spark Star",
-    color: "#fff59d",
-    accent: "#ffffff",
-    score: 10,
-    size: 18,
-    shape: "star",
-  },
-};
-
-const treeGeometry = {
-  apex: { x: canvas.width / 2, y: 80 },
-  leftBase: { x: canvas.width / 2 - 240, y: canvas.height - 90 },
-  rightBase: { x: canvas.width / 2 + 240, y: canvas.height - 90 },
-  trunkHeight: 70,
+const config = {
+  gravity: 2200,
+  jumpVelocity: 940,
+  baseSpeed: 260,
+  maxSpeedBoost: 220,
+  coyoteTime: 0.12,
+  jumpBuffer: 0.16,
+  platformHeight: 56,
 };
 
 const state = {
-  ornaments: [],
-  twinkle: Number(twinkleRange.value) / 100,
-  snowEnabled: true,
-  selectedType: "classic",
-  snowflakes: createSnowflakes(140),
-  lights: createLightGarlands(),
-  lastFrame: 0,
+  player: null,
+  platforms: [],
+  particles: [],
+  cameraX: 0,
+  distance: 0,
+  bestDistance: 0,
+  lastTime: 0,
+  isRunning: true,
+  spawnX: 0,
+  jumpGrace: 0,
+  jumpBufferTimer: 0,
+  onGround: false,
+  startX: 0,
+  speed: config.baseSpeed,
 };
 
-palette.addEventListener("click", (event) => {
-  const button = event.target.closest(".palette-btn");
-  if (!button) return;
-  const type = button.dataset.type;
-  if (!ornamentCatalog[type]) return;
-  setSelectedType(type);
-});
-
-canvas.addEventListener("click", (event) => {
-  const point = getCanvasCoordinates(event);
-  if (!pointInsideTree(point.x, point.y)) return;
-  addOrnament(point.x, point.y, state.selectedType);
-});
-
-twinkleRange.addEventListener("input", (event) => {
-  state.twinkle = Number(event.target.value) / 100;
-});
-
-snowToggleBtn.addEventListener("click", () => {
-  state.snowEnabled = !state.snowEnabled;
-  snowToggleBtn.textContent = state.snowEnabled ? "Pause Snowfall" : "Resume Snowfall";
-});
-
-sparkleBtn.addEventListener("click", () => {
-  scatterSparkle();
-});
-
-undoBtn.addEventListener("click", () => {
-  state.ornaments.pop();
-  updateStats();
-});
-
-resetBtn.addEventListener("click", () => {
-  state.ornaments = [];
-  state.twinkle = Number(twinkleRange.value) / 100;
-  state.snowflakes = createSnowflakes(140);
-  setSelectedType("classic");
-  updateStats();
-});
-
-function setSelectedType(type) {
-  state.selectedType = type;
-  paletteButtons.forEach((btn) => {
-    if (btn.dataset.type === type) {
-      btn.classList.add("is-selected");
-    } else {
-      btn.classList.remove("is-selected");
-    }
-  });
-  selectedLabelEl.textContent = ornamentCatalog[type].label;
+function randomRange(min, max) {
+  return Math.random() * (max - min) + min;
 }
 
-function addOrnament(x, y, type) {
-  state.ornaments.push({
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function createPlayer() {
+  return {
+    x: 80,
+    y: canvas.height - 220,
+    width: 44,
+    height: 44,
+    vy: 0,
+  };
+}
+
+function createPlatform(x, y, width) {
+  return {
     x,
     y,
-    type,
-    rotation: Math.random() * Math.PI * 2,
-    swayOffset: Math.random() * Math.PI * 2,
-  });
-  updateStats();
+    width,
+    height: config.platformHeight,
+  };
 }
 
-function updateStats() {
-  ornamentCountEl.textContent = state.ornaments.length.toString();
-  scoreEl.textContent = calculateScore().toString();
+function resetGame() {
+  state.player = createPlayer();
+  state.platforms = [];
+  state.particles = [];
+  state.cameraX = 0;
+  state.distance = 0;
+  state.spawnX = -200;
+  state.jumpGrace = 0;
+  state.jumpBufferTimer = 0;
+  state.onGround = false;
+  state.startX = state.player.x;
+  state.isRunning = true;
+  state.lastTime = 0;
+  state.speed = config.baseSpeed;
+  seedWorld();
+  updateHud();
 }
 
-function calculateScore() {
-  if (state.ornaments.length === 0) return 0;
-  const base = state.ornaments.reduce((sum, ornament) => sum + (ornamentCatalog[ornament.type]?.score ?? 4), 0);
-  const uniqueTypes = new Set(state.ornaments.map((ornament) => ornament.type)).size;
-  const left = state.ornaments.filter((ornament) => ornament.x < canvas.width / 2).length;
-  const right = state.ornaments.length - left;
-  const balanceBonus = Math.max(0, 12 - Math.abs(left - right) * 3);
-  const fullnessBonus = Math.min(18, state.ornaments.length * 1.2);
-  const varietyBonus = uniqueTypes * 5;
-  return Math.round(base + varietyBonus + balanceBonus + fullnessBonus);
+function seedWorld() {
+  const baseY = canvas.height - 110;
+  state.platforms.push(createPlatform(-320, baseY, 720));
+  state.spawnX = 420;
+  ensurePlatforms();
 }
 
-function getCanvasCoordinates(event) {
-  const rect = canvas.getBoundingClientRect();
-  const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
-  const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
-  return { x, y };
-}
-
-function pointInsideTree(px, py) {
-  return pointInTriangle(px, py, treeGeometry.apex, treeGeometry.leftBase, treeGeometry.rightBase);
-}
-
-function pointInTriangle(px, py, a, b, c) {
-  const area = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
-  const s = ((b.y - c.y) * (px - c.x) + (c.x - b.x) * (py - c.y)) / area;
-  const t = ((c.y - a.y) * (px - c.x) + (a.x - c.x) * (py - c.y)) / area;
-  const u = 1 - s - t;
-  return s >= 0 && t >= 0 && u >= 0;
-}
-
-function scatterSparkle() {
-  const drops = 4 + Math.floor(Math.random() * 3);
-  for (let i = 0; i < drops; i += 1) {
-    const point = randomPointInsideTree();
-    const types = Object.keys(ornamentCatalog);
-    const type = types[Math.floor(Math.random() * types.length)];
-    addOrnament(point.x, point.y, type);
+function ensurePlatforms() {
+  const lookAhead = state.player.x + 1600;
+  while (state.spawnX < lookAhead) {
+    const prev = state.platforms[state.platforms.length - 1];
+    const gap = randomRange(110, 220 + Math.min(140, state.distance * 0.25));
+    const width = randomRange(120, 260);
+    const variance = randomRange(-120, 120);
+    const minY = canvas.height - 320;
+    const maxY = canvas.height - 140;
+    const y = clamp(prev.y + variance, minY, maxY);
+    const platform = createPlatform(state.spawnX + gap, y, width);
+    state.platforms.push(platform);
+    state.spawnX = platform.x + platform.width;
   }
 }
 
-function randomPointInsideTree() {
-  let r1 = Math.random();
-  let r2 = Math.random();
-  if (r1 + r2 > 1) {
-    r1 = 1 - r1;
-    r2 = 1 - r2;
+function cullPlatforms() {
+  const cutoff = state.cameraX - 300;
+  state.platforms = state.platforms.filter((platform) => platform.x + platform.width > cutoff);
+}
+
+function update(timestamp) {
+  if (!state.lastTime) state.lastTime = timestamp;
+  const dt = Math.min(0.033, (timestamp - state.lastTime) / 1000);
+  state.lastTime = timestamp;
+
+  if (state.isRunning) {
+    updateGame(dt);
+  } else {
+    updateParticles(dt);
   }
-  const ax = treeGeometry.apex.x;
-  const ay = treeGeometry.apex.y;
-  const bx = treeGeometry.leftBase.x;
-  const by = treeGeometry.leftBase.y;
-  const cx = treeGeometry.rightBase.x;
-  const cy = treeGeometry.rightBase.y;
-  const px = ax + r1 * (bx - ax) + r2 * (cx - ax);
-  const py = ay + r1 * (by - ay) + r2 * (cy - ay);
-  return { x: px, y: py - 20 };
+
+  render();
+  requestAnimationFrame(update);
 }
 
-function createSnowflakes(count) {
-  return Array.from({ length: count }, () => ({
-    x: Math.random() * canvas.width,
-    y: Math.random() * canvas.height,
-    radius: 1 + Math.random() * 2.2,
-    speed: 30 + Math.random() * 40,
-    drift: Math.random() * 0.4 - 0.2,
-  }));
+function updateGame(dt) {
+  if (state.jumpGrace > 0) state.jumpGrace -= dt;
+  if (state.jumpBufferTimer > 0) state.jumpBufferTimer -= dt;
+
+  const player = state.player;
+  const prevY = player.y;
+
+  state.speed = config.baseSpeed + Math.min(config.maxSpeedBoost, state.distance * 0.8);
+  player.x += state.speed * dt;
+
+  player.vy += config.gravity * dt;
+  player.y += player.vy * dt;
+
+  handleCollisions(prevY);
+
+  if (state.jumpBufferTimer > 0 && (state.onGround || state.jumpGrace > 0)) {
+    performJump();
+  }
+
+  state.cameraX = Math.max(0, player.x - 320);
+  ensurePlatforms();
+  cullPlatforms();
+
+  state.distance = Math.max(0, Math.floor((player.x - state.startX) / 8));
+  updateParticles(dt);
+
+  if (player.y > canvas.height + 240) {
+    endRun();
+  }
+  updateHud();
 }
 
-function updateSnow(dt) {
-  if (!state.snowEnabled) return;
-  state.snowflakes.forEach((flake) => {
-    flake.y += flake.speed * dt;
-    flake.x += flake.drift * flake.speed * 0.2;
-    if (flake.y > canvas.height + 10) {
-      flake.y = -10;
-      flake.x = Math.random() * canvas.width;
+function handleCollisions(prevY) {
+  const player = state.player;
+  const wasGrounded = state.onGround;
+  state.onGround = false;
+
+  const prevBottom = prevY + player.height;
+  const bottom = player.y + player.height;
+
+  for (const platform of state.platforms) {
+    if (player.x + player.width < platform.x || player.x > platform.x + platform.width) continue;
+    const platformTop = platform.y;
+    if (prevBottom <= platformTop && bottom >= platformTop) {
+      player.y = platformTop - player.height;
+      player.vy = 0;
+      state.onGround = true;
+      state.jumpGrace = config.coyoteTime;
+      if (!wasGrounded) {
+        emitLandingDust(player.x + player.width / 2, platformTop);
+      }
     }
-    if (flake.x < -10) flake.x = canvas.width + 10;
-    if (flake.x > canvas.width + 10) flake.x = -10;
-  });
+  }
+}
+
+function performJump() {
+  state.player.vy = -config.jumpVelocity;
+  state.onGround = false;
+  state.jumpGrace = 0;
+  state.jumpBufferTimer = 0;
+}
+
+function endRun() {
+  state.isRunning = false;
+  state.bestDistance = Math.max(state.bestDistance, state.distance);
+  updateHud();
+}
+
+function queueJump() {
+  state.jumpBufferTimer = config.jumpBuffer;
+}
+
+function emitLandingDust(x, y) {
+  for (let i = 0; i < 12; i += 1) {
+    const angle = randomRange(Math.PI, 2 * Math.PI);
+    const speed = randomRange(60, 160);
+    state.particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed * 0.4,
+      life: 0,
+      maxLife: 0.4,
+    });
+  }
 }
 
 function createLightGarlands() {
@@ -245,6 +229,13 @@ function createLightGarlands() {
     }
   });
   return lights;
+}
+
+function updateHud() {
+  distanceEl.textContent = `${state.distance}m`;
+  bestEl.textContent = `${state.bestDistance}m`;
+  const blocksPerSecond = (state.speed / 60).toFixed(1);
+  paceEl.textContent = `${blocksPerSecond} b/s`;
 }
 
 function drawBackground() {

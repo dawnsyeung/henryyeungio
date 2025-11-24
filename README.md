@@ -8,19 +8,21 @@ An interactive Christmas tree decorating game built with vanilla HTML, CSS, and 
    ```bash
    python -m http.server 4173
    ```
+2. The runner auto-moves. Focus on jump timing: press Space, W, or the Up Arrow.
+3. Queue jumps before you leave an edge — buffered jumps trigger on the next frame you can jump.
+4. Falling beneath the islands ends the run. Click restart or tap R to reset instantly.
 2. Click anywhere on the tree to place the currently selected ornament.
 3. Use the palette on the right to swap ornament styles, adjust the light twinkle slider, pause snowfall, or trigger a Surprise Sparkle.
 4. Use **Undo Ornament** to step back or **Reset Tree** to clear everything.
 
 ## Features
 
-- **Five ornament archetypes** (glass, frosted, bell, candy, star) each with unique artwork and scoring values.
-- **Festive score tracker** that rewards variety, balance, and fullness.
-- **Animated scene** complete with twinkling garlands, snowfall, and a glowing tree topper.
-- **Accessibility-friendly controls** — everything runs client-side with no dependencies.
+- Starts are gentle: long platforms with short gaps. Distance increases speed and gap sizes.
+- Landings refresh your jump window. Leaving a block grants ~0.12s of coyote time for forgiving inputs.
+- The HUD tracks current distance, best run, and momentum (blocks per second).
 
 ## Customizing
 
-- Adjust ornament colors, sizes, or scores inside the `ornamentCatalog` in `app.js`.
-- Tweak tree colors, typography, or layout in `styles.css`.
-- Modify the scoring logic inside `calculateScore` to match your own vibe-based grading rubric.
+- Tweak gravity, jump force, and speed ramps inside `config` in `app.js`.
+- Adjust platform frequency/height via `ensurePlatforms` and `createPlatform`.
+- Theme the UI and islands by editing CSS variables and canvas drawing colors in `styles.css` / `app.js`.
