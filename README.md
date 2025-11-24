@@ -1,6 +1,6 @@
-# Gun Swap Arena
+# Blockstep Parkour
 
-A tiny top-down browser shooter built with vanilla HTML, CSS, and JavaScript. Survive waves of enemies with 10 lives — every kill instantly swaps your gun to a new archetype with different fire rates, spreads, and damage.
+A lightweight browser parkour challenge inspired by Minecraft jump maps. Auto-sprint across floating voxels, queue jumps early, and chase your farthest distance without slipping into the void.
 
 ## Getting Started
 
@@ -9,19 +9,18 @@ A tiny top-down browser shooter built with vanilla HTML, CSS, and JavaScript. Su
    # optional local server
    python -m http.server 4173
    ```
-2. Move with WASD or the arrow keys.
-3. Aim with the mouse and hold the left button to fire.
-4. Colliding with an enemy costs one life. When you hit zero, the run ends — use the restart button to jump back in.
+2. The runner auto-moves. Focus on jump timing: press Space, W, or the Up Arrow.
+3. Queue jumps before you leave an edge — buffered jumps trigger on the next frame you can jump.
+4. Falling beneath the islands ends the run. Click restart or tap R to reset instantly.
 
 ## Gameplay Details
 
-- You always begin with 10 lives and the Starter Pistol.
-- Enemy spawns accelerate as your kill count rises.
-- Gun order cycles with each kill, so plan around fast SMG bursts, high-damage slugs, shotguns, and more.
-- The HUD at the top keeps track of remaining lives, total kills, and your currently equipped weapon.
+- Starts are gentle: long platforms with short gaps. Distance increases speed and gap sizes.
+- Landings refresh your jump window. Leaving a block grants ~0.12s of coyote time for forgiving inputs.
+- The HUD tracks current distance, best run, and momentum (blocks per second).
 
 ## Customizing
 
-- Edit the `guns` array in `app.js` to tweak fire rates, damage, spread, color, or pellet count.
-- Adjust spawn pacing via `maybeTightenSpawn` and the `spawnEnemy` helper.
-- Update the neon-inspired theme by tweaking CSS variables in `styles.css`.
+- Tweak gravity, jump force, and speed ramps inside `config` in `app.js`.
+- Adjust platform frequency/height via `ensurePlatforms` and `createPlatform`.
+- Theme the UI and islands by editing CSS variables and canvas drawing colors in `styles.css` / `app.js`.

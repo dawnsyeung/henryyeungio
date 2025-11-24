@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gun Swap Arena</title>
+    <title>Blockstep Parkour</title>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap"
@@ -15,22 +15,22 @@
     <div class="app-shell">
       <header class="panel hud">
         <div>
-          <p class="eyebrow">Arcade Survival</p>
-          <h1>Gun Swap Arena</h1>
-          <p>Survive onslaughts with 10 lives. Every eliminaton swaps your weapon.</p>
+          <p class="eyebrow">Endless Parkour Trial</p>
+          <h1>Blockstep Parkour</h1>
+          <p>Dash across floating voxels, queue jumps early, and keep your sprint alive.</p>
         </div>
         <div class="stats">
           <div class="stat">
-            <p class="label">Lives</p>
-            <p id="lives" class="value">10</p>
+            <p class="label">Distance</p>
+            <p id="distance" class="value">0m</p>
           </div>
           <div class="stat">
-            <p class="label">Kills</p>
-            <p id="kills" class="value">0</p>
+            <p class="label">Best</p>
+            <p id="best" class="value">0m</p>
           </div>
           <div class="stat">
-            <p class="label">Current Gun</p>
-            <p id="gun" class="value gun-name">Starter Pistol</p>
+            <p class="label">Momentum</p>
+            <p id="pace" class="value gun-name">0 b/s</p>
           </div>
         </div>
       </header>
@@ -43,14 +43,13 @@
       <section class="panel instructions">
         <h2>How to Play</h2>
         <ul>
-          <li>WASD or arrow keys to move. Aim with the mouse and left-click to fire.</li>
-          <li>Every enemy takedown instantly equips a randomly rolled gun with unique stats.</li>
-          <li>You start with 10 lives. Colliding with an enemy costs one life.</li>
-          <li>Keep killing to climb the leaderboard UI and chase your longest survival streak.</li>
+          <li>Your runner auto-sprints — focus on timing jumps from block to block.</li>
+          <li>Press Space, W, or the Up Arrow to jump. Pressing early will buffer the jump.</li>
+          <li>Land cleanly to refresh jump timing. Falling into the void ends the run.</li>
+          <li>Distance ramps the challenge: gaps stretch farther and platforms shift in height.</li>
         </ul>
         <p class="hint">
-          Pro tip: Some guns fire slower but hit harder. Others spray fast but deal less per shot.
-          Adapt fast!
+          Pro tip: Tap jump just before sliding off an edge to keep your momentum through wide gaps.
         </p>
       </section>
     </div>

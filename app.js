@@ -1,319 +1,206 @@
 const canvas = document.getElementById("game-canvas");
 const ctx = canvas.getContext("2d");
-const livesEl = document.getElementById("lives");
-const killsEl = document.getElementById("kills");
-const gunEl = document.getElementById("gun");
+const distanceEl = document.getElementById("distance");
+const bestEl = document.getElementById("best");
+const paceEl = document.getElementById("pace");
 const resetBtn = document.getElementById("reset-btn");
 
-const guns = [
-  {
-    name: "Starter Pistol",
-    fireRate: 280,
-    bulletSpeed: 520,
-    damage: 1,
-    pellets: 1,
-    spread: 0.02,
-    color: "#fefefe",
-  },
-  {
-    name: "Auto SMG",
-    fireRate: 110,
-    bulletSpeed: 460,
-    damage: 0.55,
-    pellets: 1,
-    spread: 0.07,
-    color: "#8af0ff",
-  },
-  {
-    name: "Slug Cannon",
-    fireRate: 600,
-    bulletSpeed: 640,
-    damage: 2.2,
-    pellets: 1,
-    spread: 0.01,
-    color: "#ffbb6e",
-  },
-  {
-    name: "Tri-Beam Laser",
-    fireRate: 260,
-    bulletSpeed: 720,
-    damage: 0.9,
-    pellets: 3,
-    spread: 0.04,
-    color: "#a18bff",
-  },
-  {
-    name: "Pulse Shotgun",
-    fireRate: 420,
-    bulletSpeed: 520,
-    damage: 0.65,
-    pellets: 6,
-    spread: 0.15,
-    color: "#ff6db9",
-  },
-];
+const config = {
+  gravity: 2200,
+  jumpVelocity: 940,
+  baseSpeed: 260,
+  maxSpeedBoost: 220,
+  coyoteTime: 0.12,
+  jumpBuffer: 0.16,
+  platformHeight: 56,
+};
 
 const state = {
   player: null,
-  bullets: [],
-  enemies: [],
+  platforms: [],
   particles: [],
-  lives: 10,
-  kills: 0,
-  gunIndex: 0,
-  isRunning: true,
-  pointer: { x: canvas.width / 2, y: canvas.height / 2 },
-  pointerDown: false,
-  keys: new Set(),
-  spawnTimer: 0,
-  spawnInterval: 1.4,
+  cameraX: 0,
+  distance: 0,
+  bestDistance: 0,
   lastTime: 0,
+  isRunning: true,
+  spawnX: 0,
+  jumpGrace: 0,
+  jumpBufferTimer: 0,
+  onGround: false,
+  startX: 0,
+  speed: config.baseSpeed,
 };
+
+function randomRange(min, max) {
+  return Math.random() * (max - min) + min;
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
 
 function createPlayer() {
   return {
-    x: canvas.width / 2,
-    y: canvas.height / 2,
-    radius: 18,
-    speed: 240,
-    lastShot: 0,
-    invulnerableUntil: 0,
+    x: 80,
+    y: canvas.height - 220,
+    width: 44,
+    height: 44,
+    vy: 0,
+  };
+}
+
+function createPlatform(x, y, width) {
+  return {
+    x,
+    y,
+    width,
+    height: config.platformHeight,
   };
 }
 
 function resetGame() {
   state.player = createPlayer();
-  state.bullets = [];
-  state.enemies = [];
+  state.platforms = [];
   state.particles = [];
-  state.lives = 10;
-  state.kills = 0;
-  state.gunIndex = 0;
-  state.spawnInterval = 1.4;
-  state.spawnTimer = 0;
-  state.lastTime = 0;
+  state.cameraX = 0;
+  state.distance = 0;
+  state.spawnX = -200;
+  state.jumpGrace = 0;
+  state.jumpBufferTimer = 0;
+  state.onGround = false;
+  state.startX = state.player.x;
   state.isRunning = true;
-  state.pointer.x = canvas.width / 2;
-  state.pointer.y = canvas.height / 2;
-  state.pointerDown = false;
-  state.keys.clear();
+  state.lastTime = 0;
+  state.speed = config.baseSpeed;
+  seedWorld();
   updateHud();
 }
 
-function currentGun() {
-  return guns[state.gunIndex];
+function seedWorld() {
+  const baseY = canvas.height - 110;
+  state.platforms.push(createPlatform(-320, baseY, 720));
+  state.spawnX = 420;
+  ensurePlatforms();
 }
 
-function updateHud() {
-  livesEl.textContent = state.lives.toString();
-  killsEl.textContent = state.kills.toString();
-  gunEl.textContent = currentGun().name;
-}
-
-resetBtn.addEventListener("click", () => {
-  resetGame();
-});
-
-canvas.addEventListener("mousemove", (event) => {
-  const rect = canvas.getBoundingClientRect();
-  state.pointer.x = event.clientX - rect.left;
-  state.pointer.y = event.clientY - rect.top;
-});
-
-canvas.addEventListener("mousedown", () => {
-  state.pointerDown = true;
-});
-
-window.addEventListener("mouseup", () => {
-  state.pointerDown = false;
-});
-
-window.addEventListener("keydown", (event) => {
-  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) {
-    event.preventDefault();
+function ensurePlatforms() {
+  const lookAhead = state.player.x + 1600;
+  while (state.spawnX < lookAhead) {
+    const prev = state.platforms[state.platforms.length - 1];
+    const gap = randomRange(110, 220 + Math.min(140, state.distance * 0.25));
+    const width = randomRange(120, 260);
+    const variance = randomRange(-120, 120);
+    const minY = canvas.height - 320;
+    const maxY = canvas.height - 140;
+    const y = clamp(prev.y + variance, minY, maxY);
+    const platform = createPlatform(state.spawnX + gap, y, width);
+    state.platforms.push(platform);
+    state.spawnX = platform.x + platform.width;
   }
-  state.keys.add(event.code);
-});
-
-window.addEventListener("keyup", (event) => {
-  state.keys.delete(event.code);
-});
-
-function tryShoot(timestamp) {
-  if (!state.pointerDown || !state.isRunning) return;
-  const gun = currentGun();
-  if (timestamp - state.player.lastShot < gun.fireRate) return;
-
-  const angle = Math.atan2(state.pointer.y - state.player.y, state.pointer.x - state.player.x);
-
-  for (let i = 0; i < gun.pellets; i += 1) {
-    const offset = (Math.random() - 0.5) * gun.spread;
-    const dir = angle + offset;
-    const vx = Math.cos(dir) * gun.bulletSpeed;
-    const vy = Math.sin(dir) * gun.bulletSpeed;
-    state.bullets.push({
-      x: state.player.x,
-      y: state.player.y,
-      vx,
-      vy,
-      damage: gun.damage,
-      life: 0,
-      maxLife: 1.5,
-      color: gun.color,
-    });
-  }
-
-  state.player.lastShot = timestamp;
 }
 
-function spawnEnemy() {
-  const edge = Math.floor(Math.random() * 4);
-  let x;
-  let y;
-  if (edge === 0) {
-    x = Math.random() * canvas.width;
-    y = -30;
-  } else if (edge === 1) {
-    x = canvas.width + 30;
-    y = Math.random() * canvas.height;
-  } else if (edge === 2) {
-    x = Math.random() * canvas.width;
-    y = canvas.height + 30;
+function cullPlatforms() {
+  const cutoff = state.cameraX - 300;
+  state.platforms = state.platforms.filter((platform) => platform.x + platform.width > cutoff);
+}
+
+function update(timestamp) {
+  if (!state.lastTime) state.lastTime = timestamp;
+  const dt = Math.min(0.033, (timestamp - state.lastTime) / 1000);
+  state.lastTime = timestamp;
+
+  if (state.isRunning) {
+    updateGame(dt);
   } else {
-    x = -30;
-    y = Math.random() * canvas.height;
+    updateParticles(dt);
   }
 
-  const radius = 16 + Math.random() * 10;
-  const baseSpeed = 50 + Math.random() * 40;
-  const speedBoost = Math.min(120, state.kills * 1.5);
-  const speed = baseSpeed + speedBoost;
-  const hp = 1 + Math.floor(state.kills / 6);
-
-  state.enemies.push({
-    x,
-    y,
-    radius,
-    speed,
-    hp,
-  });
+  render();
+  requestAnimationFrame(update);
 }
 
-function updatePlayer(dt) {
+function updateGame(dt) {
+  if (state.jumpGrace > 0) state.jumpGrace -= dt;
+  if (state.jumpBufferTimer > 0) state.jumpBufferTimer -= dt;
+
   const player = state.player;
-  if (!player) return;
+  const prevY = player.y;
 
-  let moveX = 0;
-  let moveY = 0;
+  state.speed = config.baseSpeed + Math.min(config.maxSpeedBoost, state.distance * 0.8);
+  player.x += state.speed * dt;
 
-  if (state.keys.has("KeyW") || state.keys.has("ArrowUp")) moveY -= 1;
-  if (state.keys.has("KeyS") || state.keys.has("ArrowDown")) moveY += 1;
-  if (state.keys.has("KeyA") || state.keys.has("ArrowLeft")) moveX -= 1;
-  if (state.keys.has("KeyD") || state.keys.has("ArrowRight")) moveX += 1;
+  player.vy += config.gravity * dt;
+  player.y += player.vy * dt;
 
-  if (moveX !== 0 || moveY !== 0) {
-    const length = Math.hypot(moveX, moveY);
-    moveX /= length;
-    moveY /= length;
+  handleCollisions(prevY);
+
+  if (state.jumpBufferTimer > 0 && (state.onGround || state.jumpGrace > 0)) {
+    performJump();
   }
 
-  player.x += moveX * player.speed * dt;
-  player.y += moveY * player.speed * dt;
+  state.cameraX = Math.max(0, player.x - 320);
+  ensurePlatforms();
+  cullPlatforms();
 
-  player.x = Math.min(Math.max(player.radius, player.x), canvas.width - player.radius);
-  player.y = Math.min(Math.max(player.radius, player.y), canvas.height - player.radius);
+  state.distance = Math.max(0, Math.floor((player.x - state.startX) / 8));
+  updateParticles(dt);
+
+  if (player.y > canvas.height + 240) {
+    endRun();
+  }
+  updateHud();
 }
 
-function updateBullets(dt) {
-  state.bullets = state.bullets.filter((bullet) => {
-    bullet.x += bullet.vx * dt;
-    bullet.y += bullet.vy * dt;
-    bullet.life += dt;
-    const onCanvas =
-      bullet.x > -40 && bullet.x < canvas.width + 40 && bullet.y > -40 && bullet.y < canvas.height + 40;
-    return bullet.life < bullet.maxLife && onCanvas;
-  });
-}
-
-function updateEnemies(dt, timestamp) {
+function handleCollisions(prevY) {
   const player = state.player;
+  const wasGrounded = state.onGround;
+  state.onGround = false;
 
-  state.enemies.forEach((enemy) => {
-    const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
-    enemy.x += Math.cos(angle) * enemy.speed * dt;
-    enemy.y += Math.sin(angle) * enemy.speed * dt;
-  });
+  const prevBottom = prevY + player.height;
+  const bottom = player.y + player.height;
 
-  // Bullet collisions
-  state.enemies = state.enemies.filter((enemy) => {
-    let alive = true;
-    for (let i = state.bullets.length - 1; i >= 0; i -= 1) {
-      const bullet = state.bullets[i];
-      const dist = Math.hypot(enemy.x - bullet.x, enemy.y - bullet.y);
-      if (dist < enemy.radius) {
-        enemy.hp -= bullet.damage;
-        state.bullets.splice(i, 1);
-        if (enemy.hp <= 0) {
-          handleEnemyDown(enemy);
-          alive = false;
-        }
-        break;
+  for (const platform of state.platforms) {
+    if (player.x + player.width < platform.x || player.x > platform.x + platform.width) continue;
+    const platformTop = platform.y;
+    if (prevBottom <= platformTop && bottom >= platformTop) {
+      player.y = platformTop - player.height;
+      player.vy = 0;
+      state.onGround = true;
+      state.jumpGrace = config.coyoteTime;
+      if (!wasGrounded) {
+        emitLandingDust(player.x + player.width / 2, platformTop);
       }
     }
-    return alive;
-  });
-
-  // Player collisions
-  if (!state.isRunning) return;
-  if (timestamp < state.player.invulnerableUntil) return;
-
-  for (let i = state.enemies.length - 1; i >= 0; i -= 1) {
-    const enemy = state.enemies[i];
-    const dist = Math.hypot(enemy.x - player.x, enemy.y - player.y);
-    if (dist < enemy.radius + player.radius) {
-      state.enemies.splice(i, 1);
-      applyDamage();
-      state.player.invulnerableUntil = timestamp + 650;
-      break;
-    }
   }
 }
 
-function handleEnemyDown(enemy) {
-  state.kills += 1;
-  cycleGun();
-  maybeTightenSpawn();
-  spawnParticles(enemy.x, enemy.y);
+function performJump() {
+  state.player.vy = -config.jumpVelocity;
+  state.onGround = false;
+  state.jumpGrace = 0;
+  state.jumpBufferTimer = 0;
+}
+
+function endRun() {
+  state.isRunning = false;
+  state.bestDistance = Math.max(state.bestDistance, state.distance);
   updateHud();
 }
 
-function applyDamage() {
-  state.lives -= 1;
-  if (state.lives <= 0) {
-    state.lives = 0;
-    state.isRunning = false;
-  }
-  updateHud();
+function queueJump() {
+  state.jumpBufferTimer = config.jumpBuffer;
 }
 
-function cycleGun() {
-  state.gunIndex = (state.gunIndex + 1) % guns.length;
-}
-
-function maybeTightenSpawn() {
-  const target = Math.max(0.5, 1.4 - state.kills * 0.018);
-  state.spawnInterval = target;
-}
-
-function spawnParticles(x, y) {
-  for (let i = 0; i < 10; i += 1) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 40 + Math.random() * 80;
+function emitLandingDust(x, y) {
+  for (let i = 0; i < 12; i += 1) {
+    const angle = randomRange(Math.PI, 2 * Math.PI);
+    const speed = randomRange(60, 160);
     state.particles.push({
       x,
       y,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
+      vy: Math.sin(angle) * speed * 0.4,
       life: 0,
       maxLife: 0.4,
     });
@@ -329,88 +216,83 @@ function updateParticles(dt) {
   });
 }
 
-function drawBackground() {
-  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, "#070918");
-  gradient.addColorStop(1, "#1b1036");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+function updateHud() {
+  distanceEl.textContent = `${state.distance}m`;
+  bestEl.textContent = `${state.bestDistance}m`;
+  const blocksPerSecond = (state.speed / 60).toFixed(1);
+  paceEl.textContent = `${blocksPerSecond} b/s`;
 }
 
-function drawGrid() {
+function drawBackground() {
+  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, "#92e0ff");
+  gradient.addColorStop(0.6, "#b0f7ff");
+  gradient.addColorStop(1, "#c7ffe3");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
   ctx.save();
-  ctx.strokeStyle = "rgba(255,255,255,0.05)";
-  ctx.lineWidth = 1;
-  const gridSize = 40;
-  for (let x = 0; x <= canvas.width; x += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, canvas.height);
-    ctx.stroke();
-  }
-  for (let y = 0; y <= canvas.height; y += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(canvas.width, y);
-    ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,0.3)";
+  for (let i = 0; i < 8; i += 1) {
+    const width = 110 + ((i * 37) % 70);
+    const height = 24 + ((i * 19) % 18);
+    const scroll = (state.cameraX * 0.18 + i * 140) % (canvas.width + width);
+    const x = scroll - width;
+    const y = 70 + (i % 3) * 42;
+    ctx.globalAlpha = 0.25;
+    ctx.fillRect(x, y, width, height);
   }
   ctx.restore();
+}
+
+function drawIslands() {
+  const block = 16;
+  state.platforms.forEach((platform) => {
+    const screenX = platform.x - state.cameraX;
+    if (screenX > canvas.width + 200 || screenX + platform.width < -200) return;
+
+    ctx.save();
+    ctx.translate(screenX, platform.y);
+
+    ctx.fillStyle = "#4caf50";
+    ctx.fillRect(0, -12, platform.width, 18);
+
+    ctx.fillStyle = "#7c4a17";
+    ctx.fillRect(0, 6, platform.width, platform.height - 6);
+
+    for (let x = 0; x < platform.width; x += block) {
+      ctx.fillStyle = x % (block * 2) === 0 ? "#6b3b16" : "#84501f";
+      ctx.fillRect(x, 6, block, platform.height - 6);
+    }
+
+    ctx.restore();
+  });
 }
 
 function drawPlayer() {
   const player = state.player;
+  const screenX = player.x - state.cameraX;
+
   ctx.save();
-  ctx.beginPath();
-  ctx.fillStyle = "#fdf5ff";
-  ctx.shadowColor = "#a060ff";
-  ctx.shadowBlur = 20;
-  ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.translate(screenX, player.y);
+  ctx.fillStyle = "#fdfcf7";
+  ctx.strokeStyle = "#1f1c1c";
+  ctx.lineWidth = 3;
+  ctx.fillRect(0, 0, player.width, player.height);
+  ctx.strokeRect(0, 0, player.width, player.height);
+
+  ctx.fillStyle = "#7cdbf5";
+  ctx.fillRect(8, 8, 10, 10);
+  ctx.fillRect(player.width - 18, 8, 10, 10);
   ctx.restore();
-}
-
-function drawPointer() {
-  ctx.save();
-  ctx.beginPath();
-  ctx.strokeStyle = "rgba(255,255,255,0.4)";
-  ctx.setLineDash([4, 6]);
-  ctx.arc(state.pointer.x, state.pointer.y, 12, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawBullets() {
-  state.bullets.forEach((bullet) => {
-    ctx.save();
-    ctx.beginPath();
-    ctx.fillStyle = bullet.color;
-    ctx.shadowColor = bullet.color;
-    ctx.shadowBlur = 12;
-    ctx.arc(bullet.x, bullet.y, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  });
-}
-
-function drawEnemies() {
-  state.enemies.forEach((enemy) => {
-    ctx.save();
-    ctx.beginPath();
-    ctx.fillStyle = "rgba(255,91,91,0.85)";
-    ctx.shadowColor = "#ff2c54";
-    ctx.shadowBlur = 20;
-    ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  });
 }
 
 function drawParticles() {
   state.particles.forEach((particle) => {
     ctx.save();
     ctx.globalAlpha = 1 - particle.life / particle.maxLife;
-    ctx.fillStyle = "#ffbeff";
-    ctx.fillRect(particle.x, particle.y, 3, 3);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(particle.x - state.cameraX, particle.y, 6, 6);
     ctx.restore();
   });
 }
@@ -418,57 +300,37 @@ function drawParticles() {
 function drawOverlay() {
   if (state.isRunning) return;
   ctx.save();
-  ctx.fillStyle = "rgba(0,0,0,0.6)";
+  ctx.fillStyle = "rgba(14, 30, 41, 0.75)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#fff";
+  ctx.fillStyle = "#f6fffb";
   ctx.textAlign = "center";
   ctx.font = "bold 36px Montserrat, sans-serif";
-  ctx.fillText("Run Over", canvas.width / 2, canvas.height / 2 - 10);
+  ctx.fillText("You slipped!", canvas.width / 2, canvas.height / 2 - 10);
   ctx.font = "20px Montserrat, sans-serif";
-  ctx.fillText(`Final Kills: ${state.kills}`, canvas.width / 2, canvas.height / 2 + 26);
-  ctx.fillText("Click restart to try again", canvas.width / 2, canvas.height / 2 + 54);
+  ctx.fillText(`Final Distance: ${state.distance}m`, canvas.width / 2, canvas.height / 2 + 26);
+  ctx.fillText("Press R or the restart button to run again", canvas.width / 2, canvas.height / 2 + 54);
   ctx.restore();
-}
-
-function update(timestamp) {
-  if (!state.lastTime) state.lastTime = timestamp;
-  const dt = Math.min(0.033, (timestamp - state.lastTime) / 1000);
-  state.lastTime = timestamp;
-
-  if (state.isRunning) {
-    handleSpawning(dt);
-    updatePlayer(dt);
-    tryShoot(timestamp);
-    updateBullets(dt);
-    updateEnemies(dt, timestamp);
-    updateParticles(dt);
-  } else {
-    updateParticles(dt);
-  }
-
-  render();
-  requestAnimationFrame(update);
-}
-
-function handleSpawning(dt) {
-  state.spawnTimer += dt;
-  if (state.spawnTimer >= state.spawnInterval) {
-    spawnEnemy();
-    state.spawnTimer = 0;
-  }
 }
 
 function render() {
   drawBackground();
-  drawGrid();
-  drawBullets();
-  drawEnemies();
+  drawIslands();
   drawPlayer();
   drawParticles();
-  drawPointer();
   drawOverlay();
 }
 
+resetBtn.addEventListener("click", resetGame);
+
+window.addEventListener("keydown", (event) => {
+  if (["ArrowUp", "Space", "KeyW"].includes(event.code)) {
+    event.preventDefault();
+    if (state.isRunning) queueJump();
+  }
+  if (event.code === "KeyR") {
+    resetGame();
+  }
+});
+
 resetGame();
-updateHud();
 requestAnimationFrame(update);

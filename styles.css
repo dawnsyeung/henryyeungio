@@ -1,14 +1,13 @@
 :root {
   color-scheme: dark;
   font-family: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --bg: radial-gradient(circle at top, #160b2c, #040109 60%);
-  --panel: rgba(14, 11, 26, 0.85);
-  --border: rgba(255, 255, 255, 0.15);
-  --text: #f8f8fb;
-  --muted: rgba(248, 248, 251, 0.7);
-  --highlight: #8e66ff;
-  --danger: #ff5b91;
-  --success: #79ffe1;
+  --bg: linear-gradient(180deg, #7cd0ff 0%, #a6e9ff 35%, #b0f0c4 100%);
+  --panel: rgba(14, 30, 41, 0.8);
+  --border: rgba(255, 255, 255, 0.2);
+  --text: #f6fffb;
+  --muted: rgba(246, 255, 251, 0.75);
+  --highlight: #7bff9b;
+  --accent: #ffb347;
 }
 
 *,
@@ -101,6 +100,7 @@ h1 {
 .gun-name {
   font-size: 1.1rem;
   color: var(--highlight);
+  text-shadow: 0 0 12px rgba(123, 255, 155, 0.45);
 }
 
 .arena {
@@ -112,9 +112,10 @@ canvas {
   width: 100%;
   height: auto;
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #02030b;
-  cursor: crosshair;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  background: linear-gradient(180deg, #a4d9ff 0%, #9ed1ff 60%, #7ecbff 100%);
+  cursor: none;
+  image-rendering: pixelated;
 }
 
 .reset {
@@ -123,8 +124,8 @@ canvas {
   right: 2rem;
   padding: 0.65rem 1.4rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(16, 50, 40, 0.7);
   color: var(--text);
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -133,7 +134,7 @@ canvas {
 }
 
 .reset:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(30, 80, 60, 0.9);
   transform: translateY(-1px);
 }
 
@@ -155,7 +156,7 @@ canvas {
 
 .hint {
   margin: 0;
-  color: var(--success);
+  color: var(--highlight);
   font-weight: 600;
 }
 
