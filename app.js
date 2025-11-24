@@ -447,6 +447,7 @@ function handleKeyDown(event) {
     case " ":
     case "Spacebar":
     case "ArrowUp":
+    case "ArrowDown":
     case "w":
     case "W":
       event.preventDefault();
