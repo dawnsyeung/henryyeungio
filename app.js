@@ -20,6 +20,7 @@ const config = {
   checkpointInterval: 250,
   checkpointToastDuration: 2.5,
   respawnFlashDuration: 0.6,
+  checkpointRespawnDelay: 2,
 };
 
 const state = {
@@ -48,6 +49,7 @@ const state = {
   respawnFlashTimer: 0,
   lastGroundPlatform: null,
   maxDistanceThisRun: 0,
+  pendingRespawn: null,
 };
 
 function loadBestDistance() {
@@ -73,6 +75,11 @@ function randomRange(min, max) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function formatSeconds(value) {
+  const fixed = value.toFixed(1);
+  return fixed.endsWith(".0") ? fixed.slice(0, -2) : fixed;
 }
 
 function createPlayer() {
@@ -119,6 +126,7 @@ function resetGame() {
   state.respawnFlashTimer = 0;
   state.lastGroundPlatform = null;
   state.maxDistanceThisRun = 0;
+  state.pendingRespawn = null;
   seedWorld();
   updateHud();
   setPauseLabel();
@@ -179,6 +187,14 @@ function update(timestamp) {
 function updateGame(dt) {
   state.jumpGrace = Math.max(0, state.jumpGrace - dt);
   state.jumpBufferTimer = Math.max(0, state.jumpBufferTimer - dt);
+
+  const waitingForRespawn = processPendingRespawn(dt);
+  if (waitingForRespawn) {
+    updateCheckpointTimers(dt);
+    updateParticles(dt);
+    updateHud();
+    return;
+  }
 
   const player = state.player;
   const prevY = player.y;
@@ -288,6 +304,9 @@ function emitCheckpointBeacon(checkpoint) {
 }
 
 function tryRespawnFromCheckpoint() {
+  if (state.pendingRespawn) {
+    return true;
+  }
   if (!state.checkpoints.length) {
     return false;
   }
@@ -295,9 +314,19 @@ function tryRespawnFromCheckpoint() {
   if (checkpoint?.platform && checkpoint.platform.checkpointReferences) {
     checkpoint.platform.checkpointReferences = Math.max(0, checkpoint.platform.checkpointReferences - 1);
   }
-  state.checkpointToastText = `Respawned • ${checkpoint.distance}m`;
-  state.checkpointToastTimer = Math.max(state.checkpointToastTimer, 1.4);
-  respawnAt(checkpoint);
+  const delay = Math.max(0, config.checkpointRespawnDelay ?? 0);
+  if (delay === 0) {
+    state.checkpointToastText = `Respawned • ${checkpoint.distance}m`;
+    state.checkpointToastTimer = Math.max(state.checkpointToastTimer, 1.4);
+    respawnAt(checkpoint);
+    return true;
+  }
+  state.pendingRespawn = {
+    checkpoint,
+    timer: delay,
+  };
+  state.checkpointToastText = `Respawning in ${formatSeconds(delay)}s`;
+  state.checkpointToastTimer = delay + 0.2;
   return true;
 }
 
@@ -317,6 +346,25 @@ function respawnAt(checkpoint) {
   state.distance = Math.max(0, Math.floor((player.x - state.startX) / 8));
   ensurePlatforms();
   cullPlatforms();
+}
+
+function processPendingRespawn(dt) {
+  if (!state.pendingRespawn) return false;
+  const pending = state.pendingRespawn;
+  pending.timer = Math.max(0, pending.timer - dt);
+  const secondsLeft = Math.max(0, pending.timer);
+  const countdownLabel = formatSeconds(secondsLeft);
+  state.checkpointToastText = `Respawning in ${countdownLabel}s`;
+  state.checkpointToastTimer = Math.max(state.checkpointToastTimer, secondsLeft + 0.2);
+  if (pending.timer <= 0) {
+    const checkpoint = pending.checkpoint;
+    state.pendingRespawn = null;
+    state.checkpointToastText = `Respawned • ${checkpoint.distance}m`;
+    state.checkpointToastTimer = Math.max(state.checkpointToastTimer, 1.4);
+    respawnAt(checkpoint);
+    return false;
+  }
+  return true;
 }
 
 function updateCheckpointTimers(dt) {
