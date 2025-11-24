@@ -1,4 +1,4 @@
-const canvas = document.getElementById("game-canvas");
+const canvas = document.getElementById("tree-canvas");
 const ctx = canvas.getContext("2d");
 const distanceEl = document.getElementById("distance");
 const bestEl = document.getElementById("best");
@@ -207,13 +207,28 @@ function emitLandingDust(x, y) {
   }
 }
 
-function updateParticles(dt) {
-  state.particles = state.particles.filter((particle) => {
-    particle.x += particle.vx * dt;
-    particle.y += particle.vy * dt;
-    particle.life += dt;
-    return particle.life < particle.maxLife;
+function createLightGarlands() {
+  const layers = [
+    { y: 200, spread: 200, count: 12 },
+    { y: 275, spread: 260, count: 14 },
+    { y: 350, spread: 300, count: 16 },
+    { y: 430, spread: 340, count: 18 },
+  ];
+  const lights = [];
+  layers.forEach((layer, layerIndex) => {
+    for (let i = 0; i < layer.count; i += 1) {
+      const t = i / (layer.count - 1);
+      const offset = (t - 0.5) * layer.spread;
+      const wobble = Math.sin(t * Math.PI * 2 + layerIndex) * 14;
+      lights.push({
+        x: canvas.width / 2 + offset,
+        y: layer.y + wobble,
+        hue: 10 + Math.random() * 320,
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
   });
+  return lights;
 }
 
 function updateHud() {
@@ -225,112 +240,232 @@ function updateHud() {
 
 function drawBackground() {
   const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, "#92e0ff");
-  gradient.addColorStop(0.6, "#b0f7ff");
-  gradient.addColorStop(1, "#c7ffe3");
+  gradient.addColorStop(0, "#030920");
+  gradient.addColorStop(0.5, "#061c2d");
+  gradient.addColorStop(1, "#0b2a2f");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.save();
-  ctx.fillStyle = "rgba(255,255,255,0.3)";
-  for (let i = 0; i < 8; i += 1) {
-    const width = 110 + ((i * 37) % 70);
-    const height = 24 + ((i * 19) % 18);
-    const scroll = (state.cameraX * 0.18 + i * 140) % (canvas.width + width);
-    const x = scroll - width;
-    const y = 70 + (i % 3) * 42;
-    ctx.globalAlpha = 0.25;
-    ctx.fillRect(x, y, width, height);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+  for (let i = 0; i < canvas.width; i += 80) {
+    ctx.fillRect(i, canvas.height - 120, 40, 120);
   }
+  ctx.restore();
+
+  ctx.save();
+  const snowGradient = ctx.createLinearGradient(0, canvas.height - 120, 0, canvas.height);
+  snowGradient.addColorStop(0, "rgba(255, 255, 255, 0)");
+  snowGradient.addColorStop(1, "rgba(255, 255, 255, 0.35)");
+  ctx.fillStyle = snowGradient;
+  ctx.fillRect(0, canvas.height - 120, canvas.width, 120);
   ctx.restore();
 }
 
-function drawIslands() {
-  const block = 16;
-  state.platforms.forEach((platform) => {
-    const screenX = platform.x - state.cameraX;
-    if (screenX > canvas.width + 200 || screenX + platform.width < -200) return;
+function drawTreeBody() {
+  const centerX = canvas.width / 2;
+  const layers = 4;
+  for (let i = 0; i < layers; i += 1) {
+    const top = treeGeometry.apex.y + i * 90;
+    const height = 120;
+    const width = 80 + i * 90;
+    const gradient = ctx.createLinearGradient(centerX, top, centerX, top + height);
+    gradient.addColorStop(0, "#0f5f3d");
+    gradient.addColorStop(0.5, "#0d4c32");
+    gradient.addColorStop(1, "#0a3725");
+    ctx.beginPath();
+    ctx.moveTo(centerX, top);
+    ctx.lineTo(centerX - width, top + height);
+    ctx.lineTo(centerX + width, top + height);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.08)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
 
-    ctx.save();
-    ctx.translate(screenX, platform.y);
-
-    ctx.fillStyle = "#4caf50";
-    ctx.fillRect(0, -12, platform.width, 18);
-
-    ctx.fillStyle = "#7c4a17";
-    ctx.fillRect(0, 6, platform.width, platform.height - 6);
-
-    for (let x = 0; x < platform.width; x += block) {
-      ctx.fillStyle = x % (block * 2) === 0 ? "#6b3b16" : "#84501f";
-      ctx.fillRect(x, 6, block, platform.height - 6);
-    }
-
-    ctx.restore();
-  });
+  // trunk
+  ctx.fillStyle = "#6f3c1f";
+  ctx.fillRect(centerX - 30, treeGeometry.leftBase.y, 60, treeGeometry.trunkHeight);
 }
 
-function drawPlayer() {
-  const player = state.player;
-  const screenX = player.x - state.cameraX;
-
+function drawGarlands() {
   ctx.save();
-  ctx.translate(screenX, player.y);
-  ctx.fillStyle = "#fdfcf7";
-  ctx.strokeStyle = "#1f1c1c";
+  ctx.strokeStyle = "rgba(255, 223, 186, 0.3)";
   ctx.lineWidth = 3;
-  ctx.fillRect(0, 0, player.width, player.height);
-  ctx.strokeRect(0, 0, player.width, player.height);
-
-  ctx.fillStyle = "#7cdbf5";
-  ctx.fillRect(8, 8, 10, 10);
-  ctx.fillRect(player.width - 18, 8, 10, 10);
+  const segments = 4;
+  const centerX = canvas.width / 2;
+  for (let i = 0; i < segments; i += 1) {
+    const y = 190 + i * 80;
+    const width = 120 + i * 70;
+    ctx.beginPath();
+    ctx.moveTo(centerX - width, y - 10);
+    ctx.quadraticCurveTo(centerX, y + 30, centerX + width, y - 10);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
-function drawParticles() {
-  state.particles.forEach((particle) => {
+function drawLights(time) {
+  ctx.save();
+  ctx.shadowBlur = 12;
+  state.lights.forEach((light, index) => {
+    const pulse = (Math.sin(time * 0.003 + light.phase) + 1) / 2;
+    const intensity = 0.4 + pulse * state.twinkle;
+    ctx.shadowColor = `hsla(${light.hue}, 80%, 70%, ${intensity})`;
+    ctx.fillStyle = `hsla(${light.hue}, 85%, ${65 + pulse * 20}%, ${intensity})`;
+    ctx.beginPath();
+    ctx.arc(light.x, light.y, 5 + Math.sin(index) * 0.8, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+function drawOrnaments(time) {
+  state.ornaments.forEach((ornament) => {
+    const spec = ornamentCatalog[ornament.type] ?? ornamentCatalog.classic;
     ctx.save();
-    ctx.globalAlpha = 1 - particle.life / particle.maxLife;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(particle.x - state.cameraX, particle.y, 6, 6);
+    const sway = Math.sin(time * 0.0012 + ornament.swayOffset) * 2;
+    ctx.translate(ornament.x + sway, ornament.y);
+    ctx.rotate(ornament.rotation * 0.05);
+    switch (spec.shape) {
+      case "flake":
+        drawFlake(spec);
+        break;
+      case "bell":
+        drawBell(spec);
+        break;
+      case "drop":
+        drawDrop(spec);
+        break;
+      case "star":
+        drawStar(spec);
+        break;
+      default:
+        drawRound(spec);
+    }
     ctx.restore();
   });
 }
 
-function drawOverlay() {
-  if (state.isRunning) return;
+function drawRound(spec) {
+  const gradient = ctx.createRadialGradient(0, 0, 4, -4, -4, spec.size);
+  gradient.addColorStop(0, spec.accent);
+  gradient.addColorStop(1, spec.color);
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(0, 0, spec.size, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = spec.accent;
+  ctx.beginPath();
+  ctx.arc(-4, -6, 4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawFlake(spec) {
+  ctx.strokeStyle = spec.accent;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < 6; i += 1) {
+    const angle = (Math.PI / 3) * i;
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(angle) * spec.size, Math.sin(angle) * spec.size);
+  }
+  ctx.stroke();
+}
+
+function drawBell(spec) {
+  ctx.fillStyle = spec.color;
+  ctx.beginPath();
+  ctx.moveTo(-spec.size * 0.6, -spec.size * 0.2);
+  ctx.quadraticCurveTo(0, -spec.size * 1.2, spec.size * 0.6, -spec.size * 0.2);
+  ctx.lineTo(spec.size * 0.5, spec.size * 0.6);
+  ctx.quadraticCurveTo(0, spec.size * 0.9, -spec.size * 0.5, spec.size * 0.6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = spec.accent;
+  ctx.fillRect(-spec.size * 0.4, spec.size * 0.35, spec.size * 0.8, 3);
+  ctx.beginPath();
+  ctx.arc(0, spec.size * 0.7, 4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawDrop(spec) {
+  ctx.fillStyle = spec.color;
+  ctx.beginPath();
+  ctx.moveTo(0, -spec.size);
+  ctx.quadraticCurveTo(spec.size, -spec.size * 0.2, 0, spec.size);
+  ctx.quadraticCurveTo(-spec.size, -spec.size * 0.2, 0, -spec.size);
+  ctx.fill();
+  ctx.fillStyle = spec.accent;
+  ctx.beginPath();
+  ctx.arc(-3, -spec.size * 0.2, 4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawStar(spec) {
+  ctx.fillStyle = spec.color;
+  ctx.beginPath();
+  const spikes = 5;
+  const outerRadius = spec.size;
+  const innerRadius = spec.size * 0.4;
+  for (let i = 0; i < spikes * 2; i += 1) {
+    const radius = i % 2 === 0 ? outerRadius : innerRadius;
+    const angle = (Math.PI / spikes) * i;
+    ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawSnow() {
+  if (!state.snowEnabled) return;
   ctx.save();
-  ctx.fillStyle = "rgba(14, 30, 41, 0.75)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#f6fffb";
-  ctx.textAlign = "center";
-  ctx.font = "bold 36px Montserrat, sans-serif";
-  ctx.fillText("You slipped!", canvas.width / 2, canvas.height / 2 - 10);
-  ctx.font = "20px Montserrat, sans-serif";
-  ctx.fillText(`Final Distance: ${state.distance}m`, canvas.width / 2, canvas.height / 2 + 26);
-  ctx.fillText("Press R or the restart button to run again", canvas.width / 2, canvas.height / 2 + 54);
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
+  state.snowflakes.forEach((flake) => {
+    ctx.beginPath();
+    ctx.arc(flake.x, flake.y, flake.radius, 0, Math.PI * 2);
+    ctx.fill();
+  });
   ctx.restore();
 }
 
-function render() {
-  drawBackground();
-  drawIslands();
-  drawPlayer();
-  drawParticles();
-  drawOverlay();
+function drawTreeTopper(time) {
+  ctx.save();
+  const pulse = (Math.sin(time * 0.004) + 1) / 2;
+  const radius = 20 + pulse * 4;
+  ctx.translate(treeGeometry.apex.x, treeGeometry.apex.y + 10);
+  ctx.fillStyle = `rgba(255, 247, 160, ${0.7 + pulse * 0.3})`;
+  ctx.beginPath();
+  for (let i = 0; i < 10; i += 1) {
+    const angle = (Math.PI / 5) * i;
+    const r = i % 2 === 0 ? radius : radius * 0.4;
+    ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
-resetBtn.addEventListener("click", resetGame);
+function loop(timestamp) {
+  if (!state.lastFrame) state.lastFrame = timestamp;
+  const dt = Math.min(0.033, (timestamp - state.lastFrame) / 1000);
+  state.lastFrame = timestamp;
 
-window.addEventListener("keydown", (event) => {
-  if (["ArrowUp", "Space", "KeyW"].includes(event.code)) {
-    event.preventDefault();
-    if (state.isRunning) queueJump();
-  }
-  if (event.code === "KeyR") {
-    resetGame();
-  }
-});
+  updateSnow(dt);
 
-resetGame();
-requestAnimationFrame(update);
+  drawBackground();
+  drawSnow();
+  drawTreeBody();
+  drawGarlands();
+  drawLights(timestamp);
+  drawOrnaments(timestamp);
+  drawTreeTopper(timestamp);
+
+  requestAnimationFrame(loop);
+}
+
+setSelectedType("classic");
+updateStats();
+requestAnimationFrame(loop);
