@@ -1,18 +1,21 @@
-const canvas = document.getElementById("tree-canvas");
-const ctx = canvas.getContext("2d");
+const canvas = document.getElementById("track-canvas");
+const ctx = canvas?.getContext("2d");
 const distanceEl = document.getElementById("distance");
 const bestEl = document.getElementById("best");
 const paceEl = document.getElementById("pace");
 const resetBtn = document.getElementById("reset-btn");
+const pauseBtn = document.getElementById("pause-btn");
+const bestStorageKey = "blockstep-best";
 
 const config = {
-  gravity: 2200,
-  jumpVelocity: 940,
-  baseSpeed: 260,
-  maxSpeedBoost: 220,
+  gravity: 2400,
+  jumpVelocity: 980,
+  baseSpeed: 280,
+  maxSpeedBoost: 260,
   coyoteTime: 0.12,
   jumpBuffer: 0.16,
   platformHeight: 56,
+  trailInterval: 0.08,
 };
 
 const state = {
@@ -21,16 +24,35 @@ const state = {
   particles: [],
   cameraX: 0,
   distance: 0,
-  bestDistance: 0,
+  bestDistance: loadBestDistance(),
   lastTime: 0,
   isRunning: true,
+  paused: false,
   spawnX: 0,
   jumpGrace: 0,
   jumpBufferTimer: 0,
   onGround: false,
   startX: 0,
   speed: config.baseSpeed,
+  trailTimer: 0,
 };
+
+function loadBestDistance() {
+  try {
+    const stored = localStorage.getItem(bestStorageKey);
+    return stored ? Number(stored) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveBestDistance() {
+  try {
+    localStorage.setItem(bestStorageKey, String(state.bestDistance));
+  } catch {
+    // ignore storage errors
+  }
+}
 
 function randomRange(min, max) {
   return Math.random() * (max - min) + min;
@@ -69,12 +91,15 @@ function resetGame() {
   state.jumpGrace = 0;
   state.jumpBufferTimer = 0;
   state.onGround = false;
+  state.trailTimer = 0;
   state.startX = state.player.x;
   state.isRunning = true;
+  state.paused = false;
   state.lastTime = 0;
   state.speed = config.baseSpeed;
   seedWorld();
   updateHud();
+  setPauseLabel();
 }
 
 function seedWorld() {
@@ -101,28 +126,32 @@ function ensurePlatforms() {
 }
 
 function cullPlatforms() {
-  const cutoff = state.cameraX - 300;
+  const cutoff = state.cameraX - 400;
   state.platforms = state.platforms.filter((platform) => platform.x + platform.width > cutoff);
 }
 
 function update(timestamp) {
   if (!state.lastTime) state.lastTime = timestamp;
-  const dt = Math.min(0.033, (timestamp - state.lastTime) / 1000);
+  let dt = Math.min(0.033, (timestamp - state.lastTime) / 1000);
   state.lastTime = timestamp;
 
-  if (state.isRunning) {
-    updateGame(dt);
-  } else {
-    updateParticles(dt);
+  if (state.paused) {
+    dt = 0;
   }
 
-  render();
+  if (state.isRunning && dt) {
+    updateGame(dt);
+  } else {
+    updateParticles(dt || 0.016);
+  }
+
+  render(timestamp);
   requestAnimationFrame(update);
 }
 
 function updateGame(dt) {
-  if (state.jumpGrace > 0) state.jumpGrace -= dt;
-  if (state.jumpBufferTimer > 0) state.jumpBufferTimer -= dt;
+  state.jumpGrace = Math.max(0, state.jumpGrace - dt);
+  state.jumpBufferTimer = Math.max(0, state.jumpBufferTimer - dt);
 
   const player = state.player;
   const prevY = player.y;
@@ -144,9 +173,15 @@ function updateGame(dt) {
   cullPlatforms();
 
   state.distance = Math.max(0, Math.floor((player.x - state.startX) / 8));
+  state.trailTimer += dt;
+  if (state.onGround && state.trailTimer >= config.trailInterval) {
+    spawnTrailDust();
+    state.trailTimer = 0;
+  }
+
   updateParticles(dt);
 
-  if (player.y > canvas.height + 240) {
+  if (player.y > canvas.height + 260) {
     endRun();
   }
   updateHud();
@@ -171,8 +206,23 @@ function handleCollisions(prevY) {
       if (!wasGrounded) {
         emitLandingDust(player.x + player.width / 2, platformTop);
       }
+      break;
     }
   }
+}
+
+function spawnTrailDust() {
+  const player = state.player;
+  state.particles.push({
+    x: player.x + player.width / 2,
+    y: player.y + player.height,
+    vx: randomRange(-40, 40),
+    vy: randomRange(40, 90),
+    life: 0,
+    maxLife: 0.25,
+    color: "rgba(255,255,255,0.35)",
+    size: randomRange(3, 6),
+  });
 }
 
 function performJump() {
@@ -184,7 +234,10 @@ function performJump() {
 
 function endRun() {
   state.isRunning = false;
-  state.bestDistance = Math.max(state.bestDistance, state.distance);
+  if (state.distance > state.bestDistance) {
+    state.bestDistance = state.distance;
+    saveBestDistance();
+  }
   updateHud();
 }
 
@@ -195,277 +248,241 @@ function queueJump() {
 function emitLandingDust(x, y) {
   for (let i = 0; i < 12; i += 1) {
     const angle = randomRange(Math.PI, 2 * Math.PI);
-    const speed = randomRange(60, 160);
+    const speed = randomRange(120, 220);
     state.particles.push({
       x,
       y,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed * 0.4,
+      vy: Math.sin(angle) * speed * 0.6,
       life: 0,
-      maxLife: 0.4,
+      maxLife: 0.45,
+      color: "rgba(240, 247, 255, 0.45)",
+      size: randomRange(2, 4),
     });
   }
 }
 
-function createLightGarlands() {
-  const layers = [
-    { y: 200, spread: 200, count: 12 },
-    { y: 275, spread: 260, count: 14 },
-    { y: 350, spread: 300, count: 16 },
-    { y: 430, spread: 340, count: 18 },
-  ];
-  const lights = [];
-  layers.forEach((layer, layerIndex) => {
-    for (let i = 0; i < layer.count; i += 1) {
-      const t = i / (layer.count - 1);
-      const offset = (t - 0.5) * layer.spread;
-      const wobble = Math.sin(t * Math.PI * 2 + layerIndex) * 14;
-      lights.push({
-        x: canvas.width / 2 + offset,
-        y: layer.y + wobble,
-        hue: 10 + Math.random() * 320,
-        phase: Math.random() * Math.PI * 2,
-      });
-    }
+function updateParticles(dt) {
+  state.particles = state.particles.filter((particle) => {
+    particle.life += dt;
+    if (particle.life > particle.maxLife) return false;
+    particle.x += particle.vx * dt;
+    particle.y += particle.vy * dt;
+    particle.vy += config.gravity * 0.6 * dt;
+    return true;
   });
-  return lights;
+}
+
+function setPaused(value) {
+  if (!state.isRunning && !value) return;
+  state.paused = value;
+  setPauseLabel();
+  if (!state.paused) {
+    state.lastTime = 0;
+  }
+}
+
+function togglePause() {
+  setPaused(!state.paused);
+}
+
+function setPauseLabel() {
+  if (pauseBtn) {
+    pauseBtn.textContent = state.paused ? "Resume" : "Pause";
+  }
 }
 
 function updateHud() {
-  distanceEl.textContent = `${state.distance}m`;
-  bestEl.textContent = `${state.bestDistance}m`;
-  const blocksPerSecond = (state.speed / 60).toFixed(1);
-  paceEl.textContent = `${blocksPerSecond} b/s`;
+  if (distanceEl) distanceEl.textContent = `${state.distance}m`;
+  if (bestEl) bestEl.textContent = `${state.bestDistance}m`;
+  if (paceEl) {
+    const blocksPerSecond = (state.speed / 60).toFixed(1);
+    paceEl.textContent = `${blocksPerSecond} b/s`;
+  }
 }
 
-function drawBackground() {
+function render(time = 0) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBackground(time);
+  drawParallax(time);
+  drawPlatforms();
+  drawParticles();
+  drawPlayer(time);
+  drawSpeedBar();
+
+  if (!state.isRunning) {
+    drawOverlay("Run Over", "Press R or Reset Run to try again");
+  } else if (state.paused) {
+    drawOverlay("Paused", "Press P or Resume to keep running");
+  }
+}
+
+function drawBackground(time) {
   const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, "#030920");
-  gradient.addColorStop(0.5, "#061c2d");
-  gradient.addColorStop(1, "#0b2a2f");
+  gradient.addColorStop(0, "#041836");
+  gradient.addColorStop(0.6, "#082238");
+  gradient.addColorStop(1, "#0a1f24");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.save();
-  ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
-  for (let i = 0; i < canvas.width; i += 80) {
-    ctx.fillRect(i, canvas.height - 120, 40, 120);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
+  const stripeOffset = (time * 0.03) % 120;
+  for (let x = -stripeOffset; x < canvas.width; x += 120) {
+    ctx.fillRect(x, canvas.height - 140, 60, 140);
   }
-  ctx.restore();
-
-  ctx.save();
-  const snowGradient = ctx.createLinearGradient(0, canvas.height - 120, 0, canvas.height);
-  snowGradient.addColorStop(0, "rgba(255, 255, 255, 0)");
-  snowGradient.addColorStop(1, "rgba(255, 255, 255, 0.35)");
-  ctx.fillStyle = snowGradient;
-  ctx.fillRect(0, canvas.height - 120, canvas.width, 120);
   ctx.restore();
 }
 
-function drawTreeBody() {
-  const centerX = canvas.width / 2;
-  const layers = 4;
-  for (let i = 0; i < layers; i += 1) {
-    const top = treeGeometry.apex.y + i * 90;
-    const height = 120;
-    const width = 80 + i * 90;
-    const gradient = ctx.createLinearGradient(centerX, top, centerX, top + height);
-    gradient.addColorStop(0, "#0f5f3d");
-    gradient.addColorStop(0.5, "#0d4c32");
-    gradient.addColorStop(1, "#0a3725");
-    ctx.beginPath();
-    ctx.moveTo(centerX, top);
-    ctx.lineTo(centerX - width, top + height);
-    ctx.lineTo(centerX + width, top + height);
-    ctx.closePath();
+function drawParallax(time) {
+  ctx.save();
+  ctx.fillStyle = "rgba(7, 32, 52, 0.6)";
+  const horizon = canvas.height - 160;
+  ctx.beginPath();
+  ctx.moveTo(0, horizon);
+  const waveOffset = (state.cameraX * 0.05 + time * 0.04) % canvas.width;
+  for (let x = -200; x < canvas.width + 200; x += 120) {
+    const peak = horizon + Math.sin((x + waveOffset) * 0.01) * 30;
+    ctx.lineTo(x, peak);
+  }
+  ctx.lineTo(canvas.width, canvas.height);
+  ctx.lineTo(0, canvas.height);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawPlatforms() {
+  ctx.save();
+  for (const platform of state.platforms) {
+    const screenX = platform.x - state.cameraX;
+    const screenY = platform.y;
+    if (screenX + platform.width < -10 || screenX > canvas.width + 10) continue;
+    const gradient = ctx.createLinearGradient(screenX, screenY, screenX, screenY + platform.height);
+    gradient.addColorStop(0, "#265c69");
+    gradient.addColorStop(1, "#14323c");
     ctx.fillStyle = gradient;
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.08)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-
-  // trunk
-  ctx.fillStyle = "#6f3c1f";
-  ctx.fillRect(centerX - 30, treeGeometry.leftBase.y, 60, treeGeometry.trunkHeight);
-}
-
-function drawGarlands() {
-  ctx.save();
-  ctx.strokeStyle = "rgba(255, 223, 186, 0.3)";
-  ctx.lineWidth = 3;
-  const segments = 4;
-  const centerX = canvas.width / 2;
-  for (let i = 0; i < segments; i += 1) {
-    const y = 190 + i * 80;
-    const width = 120 + i * 70;
-    ctx.beginPath();
-    ctx.moveTo(centerX - width, y - 10);
-    ctx.quadraticCurveTo(centerX, y + 30, centerX + width, y - 10);
-    ctx.stroke();
+    ctx.fillRect(screenX, screenY, platform.width, platform.height);
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.fillRect(screenX, screenY, platform.width, 4);
   }
   ctx.restore();
 }
 
-function drawLights(time) {
+function drawPlayer(time) {
+  const player = state.player;
+  const screenX = player.x - state.cameraX;
   ctx.save();
-  ctx.shadowBlur = 12;
-  state.lights.forEach((light, index) => {
-    const pulse = (Math.sin(time * 0.003 + light.phase) + 1) / 2;
-    const intensity = 0.4 + pulse * state.twinkle;
-    ctx.shadowColor = `hsla(${light.hue}, 80%, 70%, ${intensity})`;
-    ctx.fillStyle = `hsla(${light.hue}, 85%, ${65 + pulse * 20}%, ${intensity})`;
-    ctx.beginPath();
-    ctx.arc(light.x, light.y, 5 + Math.sin(index) * 0.8, 0, Math.PI * 2);
-    ctx.fill();
-  });
+  ctx.translate(screenX, player.y);
+  ctx.fillStyle = "#f7fffd";
+  ctx.shadowColor = "rgba(123,255,155,0.45)";
+  ctx.shadowBlur = 18;
+  ctx.fillRect(0, 0, player.width, player.height);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#ff8a5c";
+  ctx.fillRect(6, 8, player.width - 12, player.height / 2);
+  ctx.fillStyle = "#1b2d3f";
+  ctx.fillRect(6, player.height - 10, player.width - 12, 10);
+
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  const bob = Math.sin(time * 0.01) * 3;
+  ctx.beginPath();
+  ctx.arc(player.width / 2, -6 + bob, 6, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
-function drawOrnaments(time) {
-  state.ornaments.forEach((ornament) => {
-    const spec = ornamentCatalog[ornament.type] ?? ornamentCatalog.classic;
-    ctx.save();
-    const sway = Math.sin(time * 0.0012 + ornament.swayOffset) * 2;
-    ctx.translate(ornament.x + sway, ornament.y);
-    ctx.rotate(ornament.rotation * 0.05);
-    switch (spec.shape) {
-      case "flake":
-        drawFlake(spec);
-        break;
-      case "bell":
-        drawBell(spec);
-        break;
-      case "drop":
-        drawDrop(spec);
-        break;
-      case "star":
-        drawStar(spec);
-        break;
-      default:
-        drawRound(spec);
-    }
-    ctx.restore();
-  });
+function drawParticles() {
+  ctx.save();
+  for (const particle of state.particles) {
+    const alpha = 1 - particle.life / particle.maxLife;
+    ctx.fillStyle = particle.color ?? `rgba(255,255,255,${alpha * 0.6})`;
+    const screenX = particle.x - state.cameraX;
+    const size = particle.size ?? 3;
+    ctx.beginPath();
+    ctx.arc(screenX, particle.y, size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
-function drawRound(spec) {
-  const gradient = ctx.createRadialGradient(0, 0, 4, -4, -4, spec.size);
-  gradient.addColorStop(0, spec.accent);
-  gradient.addColorStop(1, spec.color);
+function drawSpeedBar() {
+  const pct = clamp((state.speed - config.baseSpeed) / config.maxSpeedBoost, 0, 1);
+  const barWidth = canvas.width * 0.4;
+  const barHeight = 12;
+  const x = canvas.width - barWidth - 32;
+  const y = canvas.height - 32;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillRect(x, y, barWidth, barHeight);
+  const gradient = ctx.createLinearGradient(x, y, x + barWidth, y);
+  gradient.addColorStop(0, "#5ef2ff");
+  gradient.addColorStop(1, "#ff8a5c");
   ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.arc(0, 0, spec.size, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = spec.accent;
-  ctx.beginPath();
-  ctx.arc(-4, -6, 4, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.fillRect(x, y, barWidth * pct, barHeight);
+  ctx.strokeStyle = "rgba(255,255,255,0.4)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, barWidth, barHeight);
+  ctx.restore();
 }
 
-function drawFlake(spec) {
-  ctx.strokeStyle = spec.accent;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (let i = 0; i < 6; i += 1) {
-    const angle = (Math.PI / 3) * i;
-    ctx.moveTo(0, 0);
-    ctx.lineTo(Math.cos(angle) * spec.size, Math.sin(angle) * spec.size);
-  }
-  ctx.stroke();
-}
-
-function drawBell(spec) {
-  ctx.fillStyle = spec.color;
-  ctx.beginPath();
-  ctx.moveTo(-spec.size * 0.6, -spec.size * 0.2);
-  ctx.quadraticCurveTo(0, -spec.size * 1.2, spec.size * 0.6, -spec.size * 0.2);
-  ctx.lineTo(spec.size * 0.5, spec.size * 0.6);
-  ctx.quadraticCurveTo(0, spec.size * 0.9, -spec.size * 0.5, spec.size * 0.6);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = spec.accent;
-  ctx.fillRect(-spec.size * 0.4, spec.size * 0.35, spec.size * 0.8, 3);
-  ctx.beginPath();
-  ctx.arc(0, spec.size * 0.7, 4, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawDrop(spec) {
-  ctx.fillStyle = spec.color;
-  ctx.beginPath();
-  ctx.moveTo(0, -spec.size);
-  ctx.quadraticCurveTo(spec.size, -spec.size * 0.2, 0, spec.size);
-  ctx.quadraticCurveTo(-spec.size, -spec.size * 0.2, 0, -spec.size);
-  ctx.fill();
-  ctx.fillStyle = spec.accent;
-  ctx.beginPath();
-  ctx.arc(-3, -spec.size * 0.2, 4, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawStar(spec) {
-  ctx.fillStyle = spec.color;
-  ctx.beginPath();
-  const spikes = 5;
-  const outerRadius = spec.size;
-  const innerRadius = spec.size * 0.4;
-  for (let i = 0; i < spikes * 2; i += 1) {
-    const radius = i % 2 === 0 ? outerRadius : innerRadius;
-    const angle = (Math.PI / spikes) * i;
-    ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
-  }
-  ctx.closePath();
-  ctx.fill();
-}
-
-function drawSnow() {
-  if (!state.snowEnabled) return;
+function drawOverlay(title, subtitle) {
   ctx.save();
+  ctx.fillStyle = "rgba(4, 10, 18, 0.7)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#f6fffb";
+  ctx.font = "700 48px Montserrat, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(title, canvas.width / 2, canvas.height / 2 - 10);
+  ctx.font = "500 20px Montserrat, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.8)";
-  state.snowflakes.forEach((flake) => {
-    ctx.beginPath();
-    ctx.arc(flake.x, flake.y, flake.radius, 0, Math.PI * 2);
-    ctx.fill();
-  });
+  ctx.fillText(subtitle, canvas.width / 2, canvas.height / 2 + 28);
   ctx.restore();
 }
 
-function drawTreeTopper(time) {
-  ctx.save();
-  const pulse = (Math.sin(time * 0.004) + 1) / 2;
-  const radius = 20 + pulse * 4;
-  ctx.translate(treeGeometry.apex.x, treeGeometry.apex.y + 10);
-  ctx.fillStyle = `rgba(255, 247, 160, ${0.7 + pulse * 0.3})`;
-  ctx.beginPath();
-  for (let i = 0; i < 10; i += 1) {
-    const angle = (Math.PI / 5) * i;
-    const r = i % 2 === 0 ? radius : radius * 0.4;
-    ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+function handleKeyDown(event) {
+  if (event.repeat) return;
+  switch (event.key) {
+    case " ":
+    case "Spacebar":
+    case "ArrowUp":
+    case "w":
+    case "W":
+      event.preventDefault();
+      queueJump();
+      break;
+    case "r":
+    case "R":
+      resetGame();
+      break;
+    case "p":
+    case "P":
+      togglePause();
+      break;
+    default:
+      break;
   }
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
 }
 
-function loop(timestamp) {
-  if (!state.lastFrame) state.lastFrame = timestamp;
-  const dt = Math.min(0.033, (timestamp - state.lastFrame) / 1000);
-  state.lastFrame = timestamp;
-
-  updateSnow(dt);
-
-  drawBackground();
-  drawSnow();
-  drawTreeBody();
-  drawGarlands();
-  drawLights(timestamp);
-  drawOrnaments(timestamp);
-  drawTreeTopper(timestamp);
-
-  requestAnimationFrame(loop);
+function handlePointer(event) {
+  event.preventDefault();
+  queueJump();
 }
 
-setSelectedType("classic");
-updateStats();
-requestAnimationFrame(loop);
+function attachEvents() {
+  if (resetBtn) resetBtn.addEventListener("click", resetGame);
+  if (pauseBtn) pauseBtn.addEventListener("click", togglePause);
+  canvas.addEventListener("pointerdown", handlePointer);
+  window.addEventListener("keydown", handleKeyDown);
+  window.addEventListener("blur", () => setPaused(true));
+}
+
+function init() {
+  if (!canvas || !ctx) return;
+  attachEvents();
+  resetGame();
+  requestAnimationFrame(update);
+}
+
+init();

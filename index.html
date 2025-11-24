@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Blockstep Parkour</title>
-    <title>Evergreen Glow · Christmas Tree Decorating Game</title>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap"
@@ -15,10 +14,14 @@
   <body>
     <div class="app-shell">
       <header class="panel hero">
-        <div>
+        <div class="hero-copy">
           <p class="eyebrow">Endless Parkour Trial</p>
           <h1>Blockstep Parkour</h1>
-          <p>Dash across floating voxels, queue jumps early, and keep your sprint alive.</p>
+          <p>Dash across floating voxels, buffer your jumps, and keep the run alive as the course speeds up.</p>
+          <div class="hero-actions">
+            <button id="reset-btn" type="button" class="primary">Reset Run</button>
+            <button id="pause-btn" type="button">Pause</button>
+          </div>
         </div>
         <div class="stats">
           <div class="stat">
@@ -32,25 +35,6 @@
           <div class="stat">
             <p class="label">Momentum</p>
             <p id="pace" class="value gun-name">0 b/s</p>
-          <p class="eyebrow">Cozy Creative Mode</p>
-          <h1>Evergreen Glow</h1>
-          <p>
-            Craft the coziest Christmas tree on the block. Pick ornaments, adjust the twinkle, and let
-            it snow while you chase the perfect festive score.
-          </p>
-        </div>
-        <div class="stats">
-          <div class="stat">
-            <p class="label">Ornaments</p>
-            <p id="ornament-count" class="value">0</p>
-          </div>
-          <div class="stat">
-            <p class="label">Festive Score</p>
-            <p id="score-value" class="value">0</p>
-          </div>
-          <div class="stat">
-            <p class="label">Selected</p>
-            <p id="selected-label" class="value gun-name">Glass Ornament</p>
           </div>
         </div>
       </header>
@@ -59,71 +43,36 @@
         <section class="panel canvas-panel">
           <div class="canvas-headline">
             <div>
-              <h2>Your Tree</h2>
-              <p>Tap anywhere on the tree to place the selected decoration. Undo or reset anytime.</p>
-            </div>
-            <div class="canvas-actions">
-              <button id="undo-btn" type="button">Undo Ornament</button>
-              <button id="reset-btn" type="button" class="primary">Reset Tree</button>
+              <h2>Active Run</h2>
+              <p>Queue jumps before you leave an edge. Landing keeps your speed climbing.</p>
             </div>
           </div>
-          <canvas id="tree-canvas" width="960" height="600" aria-label="Christmas tree builder"></canvas>
+          <canvas
+            id="track-canvas"
+            width="960"
+            height="540"
+            aria-label="Blockstep parkour track"
+            tabindex="0"
+          ></canvas>
         </section>
 
-        <section class="panel controls">
+        <section class="panel guide">
           <div class="controls-head">
-            <h2>Decoration Kit</h2>
-            <p>Choose a style, tweak the twinkle, and let the snowfall set the mood.</p>
+            <h2>How to Play</h2>
+            <p>Buffered jumps trigger on the first possible frame. Staying grounded refreshes the buffer.</p>
           </div>
-          <div id="palette" class="palette" role="listbox" aria-label="Available ornaments">
-            <button class="palette-btn is-selected" data-type="classic" type="button">
-              <span class="icon">🔴</span>
-              <span class="label">Glass Ornament</span>
-            </button>
-            <button class="palette-btn" data-type="frost" type="button">
-              <span class="icon">❄️</span>
-              <span class="label">Frosted Flake</span>
-            </button>
-            <button class="palette-btn" data-type="bell" type="button">
-              <span class="icon">🔔</span>
-              <span class="label">Golden Bell</span>
-            </button>
-            <button class="palette-btn" data-type="candy" type="button">
-              <span class="icon">🍬</span>
-              <span class="label">Candy Drop</span>
-            </button>
-            <button class="palette-btn" data-type="star" type="button">
-              <span class="icon">⭐</span>
-              <span class="label">Spark Star</span>
-            </button>
-          </div>
-
-          <div class="control-row">
-            <label for="twinkle-range">Twinkle intensity</label>
-            <input
-              id="twinkle-range"
-              type="range"
-              min="20"
-              max="100"
-              value="70"
-              step="1"
-              aria-label="Adjust light twinkle"
-            />
-          </div>
-
-          <div class="toggles">
-            <button id="snow-toggle" class="toggle-btn" type="button">Pause Snowfall</button>
-            <button id="sparkle-btn" class="toggle-btn" type="button">Surprise Sparkle</button>
-          </div>
-
-          <div class="tips">
-            <h3>Tips</h3>
-            <ul>
-              <li>Balance both sides of the tree for bonus style points.</li>
-              <li>Mix at least three ornament types to unlock a magic boost.</li>
-              <li>The slider brightens the string lights — dim for calm, max for party mode.</li>
-              <li>Need inspiration? Hit Surprise Sparkle to scatter a few ornaments automatically.</li>
-            </ul>
+          <ul class="tips">
+            <li>Press Space, W, Up Arrow, or tap to jump. Hold to queue a buffer.</li>
+            <li>R resets instantly. P or the Pause button toggles slow-motion inspect mode.</li>
+            <li>Coyote time lets you leave a block for ~0.12s and still jump.</li>
+            <li>The momentum stat shows blocks per second — higher values mean longer gaps.</li>
+            <li>Land in the middle of platforms to avoid clipping short gaps as speed rises.</li>
+          </ul>
+          <div class="hotkeys">
+            <p><span class="key">Space/W/↑</span> jump & buffer</p>
+            <p><span class="key">R</span> reset run</p>
+            <p><span class="key">P</span> pause/resume</p>
+            <p><span class="key">Click/Touch</span> jump</p>
           </div>
         </section>
       </main>
