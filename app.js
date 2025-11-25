@@ -4,6 +4,7 @@ const distanceEl = document.getElementById("distance");
 const bestEl = document.getElementById("best");
 const paceEl = document.getElementById("pace");
 const checkpointEl = document.getElementById("checkpoint");
+const dashEl = document.getElementById("dash");
 const timerEl = document.getElementById("timer");
 const resetBtn = document.getElementById("reset-btn");
 const pauseBtn = document.getElementById("pause-btn");
@@ -32,6 +33,12 @@ const config = {
   lavaWaveAmplitude: 18,
   lavaWaveLength: 220,
   forestBaseHeight: 110,
+  dashSpeedBonus: 420,
+  dashDuration: 0.22,
+  dashVerticalBoost: 620,
+  dashGravityScale: 0.6,
+  dashBuffer: 0.2,
+  dashTrailInterval: 0.03,
 };
 
 const state = {
@@ -42,11 +49,16 @@ const state = {
   distance: 0,
   bestDistance: loadBestDistance(),
   lastTime: 0,
+  lastPointerTap: 0,
   isRunning: true,
   paused: false,
   spawnX: 0,
   jumpGrace: 0,
   jumpBufferTimer: 0,
+  dashBufferTimer: 0,
+  dashActiveTimer: 0,
+  dashTrailTimer: 0,
+  dashCharge: true,
   onGround: false,
   startX: 0,
   speed: config.baseSpeed,
@@ -134,6 +146,11 @@ function resetGame() {
   state.spawnX = -200;
   state.jumpGrace = 0;
   state.jumpBufferTimer = 0;
+  state.lastPointerTap = 0;
+  state.dashBufferTimer = 0;
+  state.dashActiveTimer = 0;
+  state.dashTrailTimer = 0;
+  state.dashCharge = true;
   state.onGround = false;
   state.trailTimer = 0;
   state.startX = state.player.x;
@@ -222,6 +239,7 @@ function updateGame(dt) {
   state.elapsed += dt;
   state.jumpGrace = Math.max(0, state.jumpGrace - dt);
   state.jumpBufferTimer = Math.max(0, state.jumpBufferTimer - dt);
+  state.dashBufferTimer = Math.max(0, state.dashBufferTimer - dt);
 
   const waitingForRespawn = processPendingRespawn(dt);
   if (waitingForRespawn) {
@@ -234,10 +252,17 @@ function updateGame(dt) {
   const player = state.player;
   const prevY = player.y;
 
-  state.speed = config.baseSpeed;
+  if (state.dashBufferTimer > 0 && canDash()) {
+    startDash();
+  }
+
+  const dashStrength = state.dashActiveTimer > 0 ? state.dashActiveTimer / config.dashDuration : 0;
+  const dashBonus = dashStrength * config.dashSpeedBonus;
+  state.speed = config.baseSpeed + dashBonus;
   player.x += state.speed * dt;
 
-  player.vy += config.gravity * dt;
+  const gravityScale = state.dashActiveTimer > 0 ? config.dashGravityScale : 1;
+  player.vy += config.gravity * gravityScale * dt;
   player.y += player.vy * dt;
 
   handleCollisions(prevY);
@@ -259,6 +284,7 @@ function updateGame(dt) {
     state.trailTimer = 0;
   }
 
+  updateDashEffects(dt);
   updateCheckpointTimers(dt);
   updateParticles(dt);
 
@@ -288,6 +314,13 @@ function handleCollisions(prevY) {
       state.onGround = true;
       state.jumpGrace = config.coyoteTime;
       state.lastGroundPlatform = platform;
+      const regainedDash = !state.dashCharge;
+      state.dashCharge = true;
+      state.dashActiveTimer = 0;
+      state.dashTrailTimer = 0;
+      if (regainedDash) {
+        state.dashBufferTimer = 0;
+      }
       if (!wasGrounded) {
         emitLandingDust(player.x + player.width / 2, platformTop);
       }
@@ -373,6 +406,10 @@ function respawnAt(checkpoint) {
   state.cameraX = Math.max(0, player.x - 320);
   state.jumpGrace = config.coyoteTime;
   state.jumpBufferTimer = 0;
+  state.dashBufferTimer = 0;
+  state.dashActiveTimer = 0;
+  state.dashTrailTimer = 0;
+  state.dashCharge = true;
   state.onGround = true;
   state.trailTimer = 0;
   state.speed = config.baseSpeed;
@@ -448,6 +485,81 @@ function queueJump() {
   state.jumpBufferTimer = config.jumpBuffer;
 }
 
+function queueDash() {
+  if (!state.isRunning) return;
+  state.dashBufferTimer = config.dashBuffer;
+}
+
+function canDash() {
+  if (!state.player) return false;
+  if (!state.dashCharge) return false;
+  if (state.dashActiveTimer > 0) return false;
+  if (state.onGround) return false;
+  if (state.pendingRespawn) return false;
+  if (!state.isRunning || state.paused) return false;
+  return true;
+}
+
+function startDash() {
+  const player = state.player;
+  if (!player) return;
+  state.dashCharge = false;
+  state.dashActiveTimer = config.dashDuration;
+  state.dashBufferTimer = 0;
+  state.dashTrailTimer = 0;
+  const boost = config.dashVerticalBoost;
+  if (boost > 0 && player.vy > -boost) {
+    player.vy = -boost;
+  }
+  spawnDashBurst(player.x + player.width / 2, player.y + player.height / 2);
+}
+
+function updateDashEffects(dt) {
+  if (state.dashActiveTimer <= 0) return;
+  const player = state.player;
+  if (player) {
+    state.dashTrailTimer += dt;
+    while (state.dashTrailTimer >= config.dashTrailInterval) {
+      spawnDashTrail(player);
+      state.dashTrailTimer -= config.dashTrailInterval;
+    }
+  }
+  state.dashActiveTimer = Math.max(0, state.dashActiveTimer - dt);
+  if (state.dashActiveTimer === 0) {
+    state.dashTrailTimer = 0;
+  }
+}
+
+function spawnDashTrail(player) {
+  state.particles.push({
+    x: player.x - 12 + randomRange(-10, 10),
+    y: player.y + player.height * 0.4 + randomRange(-8, 8),
+    vx: randomRange(-150, -40),
+    vy: randomRange(-60, 60),
+    life: 0,
+    maxLife: 0.25,
+    color: "rgba(255, 214, 240, 0.5)",
+    size: randomRange(2, 4),
+  });
+}
+
+function spawnDashBurst(x, y) {
+  for (let i = 0; i < 18; i += 1) {
+    const angle = randomRange(-Math.PI / 4, Math.PI / 4);
+    const speed = randomRange(220, 420);
+    state.particles.push({
+      x: x - 12,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed * 0.5,
+      life: 0,
+      maxLife: randomRange(0.25, 0.45),
+      color: "rgba(255, 190, 130, 0.65)",
+      size: randomRange(2, 5),
+    });
+  }
+}
+
 function emitLandingDust(x, y) {
   for (let i = 0; i < 12; i += 1) {
     const angle = randomRange(Math.PI, 2 * Math.PI);
@@ -512,6 +624,15 @@ function updateHud() {
       checkpointEl.textContent = `${state.lastUnlockedCheckpointDistance}m • ${banked} ${label}`;
     } else {
       checkpointEl.textContent = `${state.lastUnlockedCheckpointDistance}m • spent`;
+    }
+  }
+  if (dashEl) {
+    if (state.dashActiveTimer > 0) {
+      dashEl.textContent = "Boost!";
+    } else if (state.dashCharge) {
+      dashEl.textContent = "Ready";
+    } else {
+      dashEl.textContent = state.onGround ? "Refilling" : "Spent";
     }
   }
 }
@@ -843,6 +964,12 @@ function handleKeyDown(event) {
       event.preventDefault();
       queueJump();
       break;
+    case "Shift":
+    case "d":
+    case "D":
+      event.preventDefault();
+      queueDash();
+      break;
     case "r":
     case "R":
       resetGame();
@@ -858,7 +985,14 @@ function handleKeyDown(event) {
 
 function handlePointer(event) {
   event.preventDefault();
+  const now = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+  if (state.lastPointerTap && now - state.lastPointerTap <= 280) {
+    queueDash();
+    state.lastPointerTap = 0;
+    return;
+  }
   queueJump();
+  state.lastPointerTap = now;
 }
 
 function attachEvents() {
