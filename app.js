@@ -835,7 +835,9 @@ function drawPlayer(time) {
     color: "#fff5ec",
     accent: "#ffbe91",
     scale: 1,
-    speed: 1,
+    tempo: clamp(state.speed / config.baseSpeed, 0.7, 1.6),
+    grounded: state.onGround,
+    verticalVelocity: player.vy,
     lineWidth: 4,
   });
 }
@@ -847,17 +849,27 @@ function drawStickFigure(x, baseY, options = {}) {
     accent = null,
     glow = false,
     scale = 1,
-    speed = 1,
+    tempo = 1,
     phase = 0,
     lineWidth = 3,
+    grounded = true,
+    verticalVelocity = 0,
   } = options;
-  const timeline = time * 0.008 * speed + phase;
-  const stride = Math.sin(timeline) * 10 * scale;
-  const counterStride = Math.cos(timeline) * 8 * scale;
+  const runStrength = clamp(tempo, 0.45, 1.85);
+  const animationSpeed = 0.008 * (0.7 + runStrength * 0.45);
+  const timeline = time * animationSpeed + phase;
+  const strideWave = Math.sin(timeline);
+  const doubleWave = Math.sin(timeline * 2);
   const torso = 30 * scale;
   const headRadius = 8 * scale;
-  const shoulderY = baseY - torso - headRadius * 2;
-  const hipY = baseY - headRadius;
+  const hipBob = doubleWave * 2.6 * scale * runStrength - (!grounded ? verticalVelocity * 0.01 : 0);
+  const shoulderY = baseY - torso - headRadius * 2 + hipBob * 0.35;
+  const hipY = baseY - headRadius + hipBob;
+  const torsoLean = strideWave * 0.12 * runStrength + (grounded ? 0 : -verticalVelocity * 0.0008);
+  const torsoOffsetX = Math.sin(timeline * 0.5) * 1.4 * scale;
+  const spineTopX = x + torsoOffsetX - torsoLean * 6;
+  const spineBottomX = x + torsoOffsetX + torsoLean * 8;
+
   ctx.save();
   ctx.strokeStyle = color;
   ctx.lineWidth = lineWidth * scale;
@@ -870,30 +882,65 @@ function drawStickFigure(x, baseY, options = {}) {
 
   // Core spine
   ctx.beginPath();
-  ctx.moveTo(x, shoulderY);
-  ctx.lineTo(x, hipY - 6 * scale);
+  ctx.moveTo(spineTopX, shoulderY);
+  ctx.lineTo(spineBottomX, hipY - 6 * scale);
   ctx.stroke();
 
-  // Arms
-  ctx.beginPath();
-  ctx.moveTo(x, shoulderY + 6 * scale);
-  ctx.lineTo(x - 12 * scale, shoulderY + 12 * scale + stride * 0.25);
-  ctx.moveTo(x, shoulderY + 6 * scale);
-  ctx.lineTo(x + 12 * scale, shoulderY + 12 * scale - stride * 0.25);
-  ctx.stroke();
+  function drawArm(side) {
+    const phaseOffset = side === -1 ? 0 : Math.PI;
+    const phase = timeline + phaseOffset;
+    const swing = Math.sin(phase) * 10 * runStrength;
+    const lift = Math.cos(phase) * 4 * runStrength;
+    const shoulder = { x: spineTopX, y: shoulderY + 6 * scale };
+    const elbow = {
+      x: shoulder.x + (swing * 0.7 + torsoLean * 6) * side,
+      y: shoulder.y + 10 * scale - lift * 0.4,
+    };
+    const hand = {
+      x: shoulder.x + (swing + torsoLean * 10) * side,
+      y: shoulder.y + 24 * scale - lift,
+    };
+    ctx.beginPath();
+    ctx.moveTo(shoulder.x, shoulder.y);
+    ctx.lineTo(elbow.x, elbow.y);
+    ctx.lineTo(hand.x, hand.y);
+    ctx.stroke();
+  }
 
-  // Legs
-  ctx.beginPath();
-  ctx.moveTo(x, hipY - 6 * scale);
-  ctx.lineTo(x - 10 * scale, hipY + 18 * scale + stride * 0.3);
-  ctx.moveTo(x, hipY - 6 * scale);
-  ctx.lineTo(x + 10 * scale, hipY + 18 * scale - stride * 0.3);
-  ctx.stroke();
+  function drawLeg(side) {
+    const phaseOffset = side === -1 ? 0 : Math.PI;
+    const phase = timeline + phaseOffset;
+    const stride = Math.sin(phase) * runStrength;
+    const lift = Math.max(0, Math.sin(phase)) * 12 * runStrength;
+    const reach = stride * 12 * scale;
+    const hip = { x: spineBottomX, y: hipY - 6 * scale };
+    const knee = {
+      x: hip.x + reach * 0.45 * side,
+      y: hip.y + 18 * scale - lift * 0.35,
+    };
+    let footY = baseY - (grounded ? Math.max(0, -stride) * 2 * scale : 10 * scale) - lift * 0.35;
+    footY -= Math.min(0, verticalVelocity) * 0.02;
+    let footX = hip.x + reach * side;
+    const minFootY = knee.y + 4 * scale;
+    const maxFootY = baseY;
+    footY = clamp(footY, minFootY, maxFootY);
+    ctx.beginPath();
+    ctx.moveTo(hip.x, hip.y);
+    ctx.lineTo(knee.x, knee.y);
+    ctx.lineTo(footX, footY);
+    ctx.stroke();
+  }
+
+  drawArm(-1);
+  drawArm(1);
+  drawLeg(-1);
+  drawLeg(1);
 
   // Head
   ctx.shadowBlur = 0;
   ctx.beginPath();
-  ctx.arc(x, shoulderY - headRadius, headRadius, 0, Math.PI * 2);
+  const headCenterY = shoulderY - headRadius - Math.sin(timeline * 2 + Math.PI / 2) * 1.2 * scale * runStrength;
+  ctx.arc(spineTopX, headCenterY, headRadius, 0, Math.PI * 2);
   ctx.stroke();
   if (accent) {
     ctx.fillStyle = accent;
@@ -906,8 +953,13 @@ function drawStickFigure(x, baseY, options = {}) {
     ctx.globalAlpha = 0.9;
     ctx.strokeStyle = accent;
     ctx.beginPath();
-    ctx.moveTo(x - 8 * scale, shoulderY + 6 * scale);
-    ctx.quadraticCurveTo(x - 2 * scale, shoulderY + 18 * scale + counterStride * 0.15, x + 10 * scale, hipY - 10 * scale);
+    ctx.moveTo(spineTopX - 8 * scale, shoulderY + 6 * scale);
+    ctx.quadraticCurveTo(
+      spineTopX - 2 * scale,
+      shoulderY + 18 * scale + strideWave * 2 * scale,
+      spineBottomX + 10 * scale,
+      hipY - 10 * scale
+    );
     ctx.stroke();
   }
 
