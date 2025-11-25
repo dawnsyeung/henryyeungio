@@ -23,6 +23,8 @@ const config = {
   minDepth: 60,
   maxDepth: 640,
   cameraOffset: 220,
+  cameraHeight: 150,
+  cameraScreenOffset: 50,
   playerForwardSpeed: 280,
   playerBackwardSpeed: 220,
   strafeSpeed: 320,
@@ -393,7 +395,7 @@ function projectPoint(x, z, height = 0) {
   if (depth <= 12) return null;
   const scale = 260 / depth;
   const screenX = canvas.width / 2 + x * scale;
-  const screenY = canvas.height - (height + 90) * scale - 60;
+  const screenY = canvas.height - (height + config.cameraHeight) * scale - config.cameraScreenOffset;
   return { x: screenX, y: screenY, scale };
 }
 
