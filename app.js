@@ -27,11 +27,6 @@ const config = {
   forestBaseHeight: 110,
 };
 
-const ghostRunners = [
-  { offsetX: -180, offsetY: 18, scale: 0.9, speed: 0.9, opacity: 0.35, phase: 0 },
-  { offsetX: 220, offsetY: -6, scale: 1.05, speed: 1.15, opacity: 0.45, phase: Math.PI / 2 },
-];
-
 const state = {
   player: null,
   platforms: [],
@@ -508,7 +503,6 @@ function render(time = 0) {
   drawPlatforms();
   drawCheckpoints(time);
   drawParticles();
-  drawGhostRunners(time);
   drawPlayer(time);
   drawCheckpointToast();
 
@@ -673,22 +667,6 @@ function drawPlayer(time) {
     scale: 1,
     speed: 1,
     lineWidth: 4,
-  });
-}
-
-function drawGhostRunners(time) {
-  const player = state.player;
-  const baseX = player.x - state.cameraX + player.width / 2;
-  const baseY = player.y + player.height;
-  ghostRunners.forEach((ghost) => {
-    drawStickFigure(baseX + ghost.offsetX, baseY + ghost.offsetY, {
-      time,
-      color: `rgba(255,255,255,${ghost.opacity})`,
-      scale: ghost.scale,
-      speed: ghost.speed,
-      phase: ghost.phase,
-      lineWidth: 3,
-    });
   });
 }
 
