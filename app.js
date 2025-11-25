@@ -621,13 +621,14 @@ function drawPlatforms() {
     const screenY = platform.y;
     if (screenX + platform.width < -10 || screenX > canvas.width + 10) continue;
     const gradient = ctx.createLinearGradient(screenX, screenY, screenX, screenY + platform.height);
-    gradient.addColorStop(0, "#4c1f18");
-    gradient.addColorStop(1, "#1a0505");
+    gradient.addColorStop(0, "#7fdc74"); // sunlit moss
+    gradient.addColorStop(0.55, "#3c8f3f"); // forest green
+    gradient.addColorStop(1, "#2a160a"); // earthy bark
     ctx.fillStyle = gradient;
     ctx.fillRect(screenX, screenY, platform.width, platform.height);
-    ctx.fillStyle = "rgba(255, 160, 96, 0.2)";
+    ctx.fillStyle = "rgba(220, 255, 210, 0.28)";
     ctx.fillRect(screenX, screenY, platform.width, 4);
-    ctx.fillStyle = "rgba(255, 120, 60, 0.25)";
+    ctx.fillStyle = "rgba(86, 52, 20, 0.4)";
     ctx.fillRect(screenX, screenY + platform.height - 5, platform.width, 5);
     ctx.strokeStyle = "rgba(0, 0, 0, 0.4)";
     ctx.lineWidth = 2;
