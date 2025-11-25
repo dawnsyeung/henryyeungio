@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Helix Ember: First-Person Breach</title>
+    <title>Skybound Springs — Jump & Dash</title>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap"
@@ -12,103 +12,57 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="app-shell">
+    <div class="game-shell">
       <header class="panel hero">
         <div class="hero-copy">
-          <p class="eyebrow">Forward Ops • Close-Quarters Siege</p>
-          <h1>Helix Ember: First-Person Breach</h1>
+          <p class="eyebrow">Arcade Prototype • Jumping Challenge</p>
+          <h1>Skybound Springs</h1>
           <p>
-            Jack into a visor feed, grab your rifle, and push down the neon trench while armed hostiles trade fire. Every click cements a
-            human-on-human duel — move fast, keep cover in play, and clear the breach before the pressure tips into a crossfire.
+            Ride a neon runway, dash past vapor blocks, and time each leap to keep the flow alive. Simple controls, fast resets, endless
+            altitude.
           </p>
           <div class="hero-actions">
-            <button id="reset-btn" type="button" class="primary">Rearm Run</button>
+            <button id="play-btn" type="button" class="primary">Play</button>
             <button id="pause-btn" type="button">Pause</button>
-            <button id="fire-btn" type="button" class="fire-btn" aria-label="Lock cursor and fire">
-              <span class="fire-icon" aria-hidden="true">✷</span>
-              <span class="fire-copy">
-                <span class="fire-title">Prime</span>
-                <span id="weapon-btn-state" class="fire-state">Standby</span>
-              </span>
-            </button>
+            <button id="reset-btn" type="button">Reset</button>
           </div>
         </div>
         <div class="stats">
           <div class="stat">
-            <p class="label">Operation Time</p>
-            <p id="mission-time" class="value">0:00</p>
-          </div>
-          <div class="stat">
-            <p class="label">Eliminations</p>
+            <p class="label">Score</p>
             <p id="score-value" class="value">0</p>
           </div>
           <div class="stat">
-            <p class="label">Wave</p>
-            <p id="wave-value" class="value">1</p>
+            <p class="label">Best</p>
+            <p id="best-value" class="value">0</p>
           </div>
           <div class="stat">
-            <p class="label">Armor</p>
-            <p id="integrity-value" class="value">100%</p>
-          </div>
-          <div class="stat">
-            <p class="label">Pressure</p>
-            <p id="threat-value" class="value gun-name">Trickle</p>
-          </div>
-          <div class="stat">
-            <p class="label">Weapon Status</p>
-            <p id="weapon-status" class="value">Standby</p>
+            <p class="label">Speed Tier</p>
+            <p id="speed-value" class="value gun-name">1.0x</p>
           </div>
         </div>
       </header>
 
-      <main class="play-area">
-        <section class="panel canvas-panel">
-          <div class="canvas-headline">
-            <div>
-              <h2>Engagement Zone</h2>
-              <p>Neon barricades flicker, muzzle flashes spark — it’s you, your rifle, and the squad striding straight at the breach.</p>
-            </div>
+      <main class="panel playfield">
+        <div class="canvas-headline">
+          <div>
+            <h2>Jumping Lane</h2>
+            <p>Tap, click, or press space to hop over neon blocks. Each second alive nudges the speed higher.</p>
           </div>
-          <canvas
-            id="track-canvas"
-            width="960"
-            height="540"
-            aria-label="First-person breach simulator"
-            tabindex="0"
-          ></canvas>
-          <div class="canvas-callout">
-            <p>Click or press Prime to lock cursor • WASD to move • Mouse to look • LMB / Space to fire • Shift to sprint • R to rearm • P pauses.</p>
-          </div>
-        </section>
-
-        <section class="panel guide">
-          <div class="controls-head">
-            <h2>Combat Manual</h2>
-            <p>Human squads push in waves. Slice the angle, keep armor intact, and never unlock the visor mid-volley.</p>
-          </div>
-          <ul class="tips">
-            <li>Lock the cursor before you move — the visor routes mouse input directly into your aim.</li>
-            <li>Hold <strong>W</strong> to drive forward and close distance before the squad fans out.</li>
-            <li>Feather <strong>A/D</strong> strafes while firing to stay slippery without losing sightlines.</li>
-            <li>Hold the trigger (mouse, touch, or the Prime control) to auto-fire when the rifle cools.</li>
-            <li>Armor is finite. Use cover blocks to break line-of-sight when volleys stack up.</li>
-            <li>R is an instant redeploy if a wave overran you. Pace waves to keep pressure manageable.</li>
-          </ul>
           <div class="hotkeys">
-            <p><span class="key">WASD</span> move the operative</p>
-            <p><span class="key">Mouse</span> look / aim</p>
-            <p><span class="key">LMB / Space</span> fire rifle</p>
-            <p><span class="key">Shift</span> sprint lane</p>
-            <p><span class="key">R</span> rearm run</p>
+            <p><span class="key">Space</span> jump</p>
+            <p><span class="key">Click</span> jump</p>
             <p><span class="key">P</span> pause / resume</p>
           </div>
-        </section>
+        </div>
+        <canvas
+          id="runner-canvas"
+          width="960"
+          height="360"
+          aria-label="Simple neon jumping game"
+        ></canvas>
+        <p id="status-text" class="status-text">Tap Play to begin.</p>
       </main>
-    </div>
-
-    <div class="corner-stopwatch" aria-live="off">
-      <p class="label">Uptime</p>
-      <p id="corner-timer" class="value">0:00</p>
     </div>
 
     <script src="./app.js" type="module"></script>
