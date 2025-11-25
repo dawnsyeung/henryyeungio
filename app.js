@@ -516,8 +516,9 @@ function startDash() {
   state.dashBufferTimer = 0;
   state.dashTrailTimer = 0;
   const boost = config.dashVerticalBoost;
-  if (boost > 0 && player.vy > -boost) {
-    player.vy = -boost;
+  if (boost > 0 && player.vy > 0) {
+    // Only cancel downward momentum so the dash feels flatter instead of launching upward
+    player.vy = Math.max(0, player.vy - boost);
   }
   spawnDashBurst(player.x + player.width / 2, player.y + player.height / 2);
 }
