@@ -17,6 +17,9 @@ const config = {
   gravity: 2400,
   jumpVelocity: 980,
   baseSpeed: 308,
+  cameraAnchor: 0.45,
+  cameraSpeedLead: 0.14,
+  cameraEase: 8,
   coyoteTime: 0.12,
   jumpBuffer: 0.16,
   platformHeight: 56,
@@ -109,6 +112,26 @@ function lerp(start, end, t) {
   return start + (end - start) * t;
 }
 
+function cameraTargetX() {
+  const player = state.player;
+  if (!player) return state.cameraX;
+  const anchorOffset = canvas.width * config.cameraAnchor - player.width / 2;
+  const lead = state.speed * config.cameraSpeedLead;
+  const target = player.x - anchorOffset + lead;
+  return Math.max(0, target);
+}
+
+function snapCameraToPlayer() {
+  state.cameraX = cameraTargetX();
+}
+
+function updateCamera(dt) {
+  if (!state.player) return;
+  const target = cameraTargetX();
+  const smoothing = dt > 0 ? 1 - Math.exp(-config.cameraEase * dt) : 1;
+  state.cameraX = lerp(state.cameraX, target, clamp(smoothing, 0, 1));
+}
+
 function formatSeconds(value) {
   const fixed = value.toFixed(1);
   return fixed.endsWith(".0") ? fixed.slice(0, -2) : fixed;
@@ -174,6 +197,7 @@ function resetGame() {
   state.elapsed = 0;
   state.lastPlatformGap = null;
   seedWorld();
+  snapCameraToPlayer();
   updateHud();
   setPauseLabel();
 }
@@ -274,7 +298,7 @@ function updateGame(dt) {
     performJump();
   }
 
-  state.cameraX = Math.max(0, player.x - 320);
+  updateCamera(dt);
   ensurePlatforms();
   cullPlatforms();
 
@@ -406,7 +430,7 @@ function respawnAt(checkpoint) {
   player.x = checkpoint.x - player.width / 2;
   player.y = checkpoint.y - player.height;
   player.vy = 0;
-  state.cameraX = Math.max(0, player.x - 320);
+  snapCameraToPlayer();
   state.jumpGrace = config.coyoteTime;
   state.jumpBufferTimer = 0;
   state.dashBufferTimer = 0;
