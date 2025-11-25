@@ -6,6 +6,7 @@ const paceEl = document.getElementById("pace");
 const checkpointEl = document.getElementById("checkpoint");
 const dashEl = document.getElementById("dash");
 const timerEl = document.getElementById("timer");
+const cornerTimerEl = document.getElementById("corner-timer");
 const resetBtn = document.getElementById("reset-btn");
 const pauseBtn = document.getElementById("pause-btn");
 const bestStorageKey = "blockstep-best";
@@ -608,7 +609,9 @@ function setPauseLabel() {
 }
 
 function updateHud() {
-  if (timerEl) timerEl.textContent = formatStopwatch(state.elapsed);
+  const formattedTime = formatStopwatch(state.elapsed);
+  if (timerEl) timerEl.textContent = formattedTime;
+  if (cornerTimerEl) cornerTimerEl.textContent = formattedTime;
   if (distanceEl) distanceEl.textContent = `${state.distance}m`;
   if (bestEl) bestEl.textContent = `${state.bestDistance}m`;
   if (paceEl) {
