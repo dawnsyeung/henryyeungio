@@ -483,9 +483,30 @@ function drawPlayer() {
   ctx.fillStyle = "#8df1ff";
   ctx.beginPath();
   ctx.moveTo(0, -bodyHeight);
-  ctx.quadraticCurveTo(bodyWidth * 0.6, -bodyHeight * 0.45, bodyWidth * 0.4, 0);
-  ctx.quadraticCurveTo(0, bodyHeight * 0.25, -bodyWidth * 0.4, 0);
-  ctx.quadraticCurveTo(-bodyWidth * 0.6, -bodyHeight * 0.45, 0, -bodyHeight);
+  ctx.lineTo(bodyWidth * 0.5, -bodyHeight * 0.55);
+  ctx.lineTo(bodyWidth * 0.35, 0);
+  ctx.lineTo(-bodyWidth * 0.35, 0);
+  ctx.lineTo(-bodyWidth * 0.5, -bodyHeight * 0.55);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.beginPath();
+  ctx.moveTo(0, -bodyHeight);
+  ctx.lineTo(bodyWidth * 0.15, -bodyHeight * 0.45);
+  ctx.lineTo(bodyWidth * 0.07, 0);
+  ctx.lineTo(-bodyWidth * 0.07, 0);
+  ctx.lineTo(-bodyWidth * 0.15, -bodyHeight * 0.45);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.moveTo(0, -bodyHeight * 0.95);
+  ctx.lineTo(bodyWidth * 0.22, -bodyHeight * 0.8);
+  ctx.lineTo(0, -bodyHeight * 0.65);
+  ctx.lineTo(-bodyWidth * 0.22, -bodyHeight * 0.8);
+  ctx.closePath();
   ctx.fill();
 
   ctx.strokeStyle = "rgba(255,255,255,0.65)";
@@ -494,12 +515,6 @@ function drawPlayer() {
   ctx.moveTo(0, -bodyHeight * 0.7);
   ctx.lineTo(0, -bodyHeight * 0.05);
   ctx.stroke();
-
-  ctx.fillStyle = "#ffffff";
-  ctx.globalAlpha = 0.9;
-  ctx.beginPath();
-  ctx.arc(0, -bodyHeight * 0.85, bodyWidth * 0.25, 0, Math.PI * 2);
-  ctx.fill();
   ctx.restore();
 }
 
