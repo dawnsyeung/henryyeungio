@@ -43,18 +43,24 @@ const state = {
   score: 0,
   best: loadBestScore(),
   currentSpeed: config.baseSpeed,
-  jumpFlash: 0,
+  lastLoser: null,
   lastTime: 0,
 };
 
-const player = {
-  width: 46,
-  height: 54,
-  x: 140,
-  y: 0,
-  vy: 0,
-  grounded: true,
-};
+const players = [
+  createPlayer({
+    label: "Player 1",
+    x: 140,
+    bodyColor: "#fefefe",
+    accentColor: "#5ef5ff",
+  }),
+  createPlayer({
+    label: "Player 2",
+    x: 220,
+    bodyColor: "#ffd8f7",
+    accentColor: "#ff84d8",
+  }),
+];
 
 init();
 
@@ -80,19 +86,24 @@ function attachEvents() {
   });
 
   controls.reset?.addEventListener("click", () => {
-    resetToIdle("Tap Play to begin.");
+    resetToIdle();
   });
 
   canvas.addEventListener("pointerdown", (event) => {
     event.preventDefault();
-    handleJumpRequest();
+    handleJumpRequest(0);
   });
 
   window.addEventListener("keydown", (event) => {
     if (event.repeat) return;
-    if (event.code === "Space" || event.code === "ArrowUp" || event.code === "KeyW") {
+    if (event.code === "Space" || event.code === "KeyW") {
       event.preventDefault();
-      handleJumpRequest();
+      handleJumpRequest(0);
+      return;
+    }
+    if (event.code === "ArrowUp" || event.code === "Numpad8") {
+      event.preventDefault();
+      handleJumpRequest(1);
       return;
     }
     if (event.code === "KeyP") {
@@ -128,14 +139,18 @@ function gameLoop(timestamp = 0) {
 }
 
 function update(dt) {
-  player.vy += config.gravity * dt;
-  player.y += player.vy * dt;
-
   const ground = groundLine();
-  if (player.y + player.height >= ground) {
-    player.y = ground - player.height;
-    player.vy = 0;
-    player.grounded = true;
+  for (const player of players) {
+    player.vy += config.gravity * dt;
+    player.y += player.vy * dt;
+
+    if (player.y + player.height >= ground) {
+      player.y = ground - player.height;
+      player.vy = 0;
+      player.grounded = true;
+    }
+
+    player.jumpFlash = Math.max(0, player.jumpFlash - dt);
   }
 
   const difficulty = Math.min(state.score / 500, 1.5);
@@ -152,14 +167,15 @@ function update(dt) {
   });
 
   for (const obstacle of state.obstacles) {
-    if (intersectsPlayer(obstacle)) {
-      endRun();
-      break;
+    for (const player of players) {
+      if (intersectsPlayer(player, obstacle)) {
+        endRun(player);
+        return;
+      }
     }
   }
 
   state.score += dt * state.currentSpeed * config.scoreRate;
-  state.jumpFlash = Math.max(0, state.jumpFlash - dt);
   updateScoreUI();
   updateSpeedReadout();
 }
@@ -178,7 +194,7 @@ function draw() {
   drawBackgroundStreaks();
   drawGround();
   drawObstacles();
-  drawPlayer();
+  drawPlayers();
   drawJumpFlash();
   drawOverlay();
 }
@@ -224,30 +240,38 @@ function drawObstacles() {
   }
 }
 
-function drawPlayer() {
-  drawRoundedRect(player.x, player.y, player.width, player.height, 12, "#fefefe");
+function drawPlayers() {
+  for (const player of players) {
+    drawPlayer(player);
+  }
+}
+
+function drawPlayer(player) {
+  drawRoundedRect(player.x, player.y, player.width, player.height, 12, player.bodyColor);
   ctx.save();
-  ctx.fillStyle = "#0f1631";
+  ctx.fillStyle = "rgba(15,22,49,0.9)";
   ctx.fillRect(player.x + 12, player.y + 16, player.width - 24, 10);
   ctx.fillRect(player.x + 14, player.y + 32, player.width - 28, 12);
-  ctx.fillStyle = "#5ef5ff";
+  ctx.fillStyle = player.accentColor;
   ctx.fillRect(player.x + player.width - 10, player.y + player.height - 18, 6, 14);
   ctx.restore();
 }
 
 function drawJumpFlash() {
-  if (state.jumpFlash <= 0) return;
-  const ratio = state.jumpFlash / config.jumpFlashLife;
   ctx.save();
-  ctx.strokeStyle = `rgba(94,245,255,${ratio * 0.9})`;
-  ctx.lineWidth = 6 * ratio;
-  const cx = player.x + player.width / 2;
-  const cy = groundLine();
-  const rx = 24 + (1 - ratio) * 50;
-  const ry = 10 + (1 - ratio) * 16;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + 6, rx, ry, 0, 0, Math.PI * 2);
-  ctx.stroke();
+  for (const player of players) {
+    if (player.jumpFlash <= 0) continue;
+    const ratio = player.jumpFlash / config.jumpFlashLife;
+    ctx.strokeStyle = `rgba(94,245,255,${ratio * 0.9})`;
+    ctx.lineWidth = 6 * ratio;
+    const cx = player.x + player.width / 2;
+    const cy = groundLine();
+    const rx = 24 + (1 - ratio) * 50;
+    const ry = 10 + (1 - ratio) * 16;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 6, rx, ry, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -277,21 +301,24 @@ function spawnObstacle() {
   state.spawnTimer = config.spawnBase - cadenceTrim + Math.random() * config.spawnVariance;
 }
 
-function handleJumpRequest() {
+function handleJumpRequest(playerIndex = 0) {
+  const player = players[playerIndex] ?? players[0];
+  if (!player) return;
   if (state.phase === "idle" || state.phase === "over") {
     startRun();
   } else if (state.phase === "playing" && state.paused) {
     resumeRun();
   }
-  jump();
+  jump(player);
 }
 
-function jump() {
+function jump(player) {
+  if (!player) return;
   if (state.phase !== "playing" || state.paused) return;
   if (!player.grounded) return;
   player.vy = -config.jumpForce;
   player.grounded = false;
-  state.jumpFlash = config.jumpFlashLife;
+  player.jumpFlash = config.jumpFlashLife;
 }
 
 function startRun() {
@@ -301,26 +328,26 @@ function startRun() {
   state.obstacles = [];
   state.spawnTimer = 0.8;
   state.currentSpeed = config.baseSpeed;
-  state.jumpFlash = 0;
-  placePlayer();
+  state.lastLoser = null;
+  placePlayers();
   updateScoreUI();
   updateSpeedReadout();
   setStatusText(getStatusMessage());
   updateControls();
 }
 
-function resetToIdle(message = "Tap Play to begin.") {
+function resetToIdle(message) {
   state.phase = "idle";
   state.paused = true;
   state.obstacles = [];
   state.spawnTimer = config.spawnBase;
   state.score = 0;
   state.currentSpeed = config.baseSpeed;
-  state.jumpFlash = 0;
-  placePlayer();
+  state.lastLoser = null;
+  placePlayers();
   updateScoreUI();
   updateSpeedReadout();
-  setStatusText(message);
+  setStatusText(message ?? getStatusMessage());
   updateControls();
 }
 
@@ -338,10 +365,13 @@ function resumeRun() {
   updateControls();
 }
 
-function endRun() {
+function endRun(loser) {
   state.phase = "over";
   state.paused = true;
-  state.jumpFlash = 0;
+  state.lastLoser = loser?.label ?? null;
+  for (const player of players) {
+    player.jumpFlash = 0;
+  }
   setStatusText(getStatusMessage());
   updateControls();
 }
@@ -384,17 +414,23 @@ function setStatusText(message) {
 }
 
 function getStatusMessage() {
-  if (state.phase === "idle") return "Tap Play to begin.";
+  const controlHelp = "P1: Space or click | P2: Arrow Up";
+  if (state.phase === "idle") return `Tap Play to begin. ${controlHelp}`;
   if (state.phase === "playing") {
-    return state.paused ? "Paused — press Play or P." : "Stay light. Space or click to jump.";
+    return state.paused ? "Paused — press Play or P." : controlHelp;
   }
-  return "You clipped a block! Tap Play to retry.";
+  const loserMessage = state.lastLoser ? `${state.lastLoser} clipped a block!` : "You clipped a block!";
+  return `${loserMessage} Tap Play to retry.`;
 }
 
-function placePlayer() {
-  player.y = groundLine() - player.height;
-  player.vy = 0;
-  player.grounded = true;
+function placePlayers() {
+  const ground = groundLine();
+  for (const player of players) {
+    player.y = ground - player.height;
+    player.vy = 0;
+    player.grounded = true;
+    player.jumpFlash = 0;
+  }
 }
 
 function groundLine() {
@@ -420,13 +456,28 @@ function drawRoundedRect(x, y, width, height, radius, color) {
   ctx.restore();
 }
 
-function intersectsPlayer(obstacle) {
+function intersectsPlayer(player, obstacle) {
   return !(
     player.x + player.width < obstacle.x ||
     player.x > obstacle.x + obstacle.width ||
     player.y + player.height < obstacle.y ||
     player.y > obstacle.y + obstacle.height
   );
+}
+
+function createPlayer({ label, x, bodyColor, accentColor }) {
+  return {
+    label,
+    width: 46,
+    height: 54,
+    x,
+    y: 0,
+    vy: 0,
+    grounded: true,
+    bodyColor,
+    accentColor,
+    jumpFlash: 0,
+  };
 }
 
 function rand(min, max) {
