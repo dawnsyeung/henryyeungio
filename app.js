@@ -23,7 +23,7 @@ const config = {
   minDepth: 60,
   maxDepth: 640,
   cameraOffset: 220,
-  cameraHeight: 150,
+  cameraHeight: 420,
   cameraScreenOffset: 50,
   playerForwardSpeed: 280,
   playerBackwardSpeed: 220,
