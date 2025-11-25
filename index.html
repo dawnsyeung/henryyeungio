@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Molten Stick Sprint</title>
+    <title>Nova Rift: Third-Person Strike</title>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap"
@@ -15,48 +15,48 @@
     <div class="app-shell">
       <header class="panel hero">
         <div class="hero-copy">
-          <p class="eyebrow">Lava Canyon Parkour</p>
-          <h1>Molten Stick Sprint</h1>
+          <p class="eyebrow">Forward Ops • Orbital Breach</p>
+          <h1>Nova Rift: Third-Person Strike</h1>
           <p>
-            Guide a lone neon stick figure sprinting over a lava river while distant tree lines race by. Queue jumps, stay above the
-            heat, and let the stopwatch prove every daring second.
+            Pilot a vanguard operative sprinting along a synth runway while drones pour through the rift ahead. Strafe, boost forward, and
+            unload plasma pulses to keep the horizon clear.
           </p>
           <div class="hero-actions">
-            <button id="reset-btn" type="button" class="primary">Reset Run</button>
+            <button id="reset-btn" type="button" class="primary">Deploy Again</button>
             <button id="pause-btn" type="button">Pause</button>
-            <button id="dash-btn" type="button" class="dash-btn" aria-label="Trigger dash burst">
-              <span class="dash-arrow" aria-hidden="true">&rarr;</span>
-              <span class="dash-copy">
-                <span class="dash-title">Dash</span>
-                <span id="dash-btn-state" class="dash-state">Ready</span>
+            <button id="fire-btn" type="button" class="fire-btn" aria-label="Fire pulse cannon">
+              <span class="fire-icon" aria-hidden="true">✷</span>
+              <span class="fire-copy">
+                <span class="fire-title">Pulse</span>
+                <span id="weapon-btn-state" class="fire-state">Ready</span>
               </span>
             </button>
           </div>
         </div>
         <div class="stats">
           <div class="stat">
-            <p class="label">Stopwatch</p>
-            <p id="timer" class="value">0:00.0</p>
+            <p class="label">Mission Time</p>
+            <p id="mission-time" class="value">0:00</p>
           </div>
           <div class="stat">
-            <p class="label">Distance</p>
-            <p id="distance" class="value">0m</p>
+            <p class="label">Score</p>
+            <p id="score-value" class="value">0</p>
           </div>
           <div class="stat">
-            <p class="label">Best</p>
-            <p id="best" class="value">0m</p>
+            <p class="label">Wave</p>
+            <p id="wave-value" class="value">1</p>
           </div>
           <div class="stat">
-            <p class="label">Heat Flow</p>
-            <p id="pace" class="value gun-name">0 b/s</p>
+            <p class="label">Integrity</p>
+            <p id="integrity-value" class="value">100%</p>
           </div>
           <div class="stat">
-            <p class="label">Checkpoint</p>
-            <p id="checkpoint" class="value">Next @ 250m</p>
+            <p class="label">Threat</p>
+            <p id="threat-value" class="value gun-name">Trickle</p>
           </div>
           <div class="stat">
-            <p class="label">Dash</p>
-            <p id="dash" class="value">Ready</p>
+            <p class="label">Weapon</p>
+            <p id="weapon-status" class="value">Ready</p>
           </div>
         </div>
       </header>
@@ -65,69 +65,50 @@
         <section class="panel canvas-panel">
           <div class="canvas-headline">
             <div>
-              <h2>Active Run</h2>
-              <p>Tap out perfect hops above the lava pit. Watch the stopwatch and aim for longer forest-lined sprints.</p>
+              <h2>Engagement Zone</h2>
+              <p>Stay mobile, hug the neon lanes, and thin out the drones before they crash through your position.</p>
             </div>
           </div>
           <canvas
             id="track-canvas"
             width="960"
             height="540"
-            aria-label="Blockstep parkour track"
+            aria-label="Third-person shooter engagement zone"
             tabindex="0"
           ></canvas>
-          <div class="parkour-stage" aria-hidden="true">
-            <div class="stage-layer stage-layer--far"></div>
-            <div class="stage-layer stage-layer--near"></div>
-            <div class="stage-track">
-              <span class="track-line track-line--one"></span>
-              <span class="track-line track-line--two"></span>
-              <span class="track-line track-line--three"></span>
-            </div>
-            <div class="stick-runner">
-              <span class="head"></span>
-              <span class="torso"></span>
-              <span class="limb arm arm--front"></span>
-              <span class="limb arm arm--back"></span>
-              <span class="limb leg leg--front"></span>
-              <span class="limb leg leg--back"></span>
-              <span class="runner-core"></span>
-            </div>
-            <div class="runner-shadow"></div>
-            <div class="runner-trail runner-trail--left"></div>
-            <div class="runner-trail runner-trail--right"></div>
+          <div class="canvas-callout">
+            <p>W/S to advance or brake • A/D to strafe • Space/Click to fire • R resets the sortie.</p>
           </div>
         </section>
 
         <section class="panel guide">
           <div class="controls-head">
-            <h2>How to Play</h2>
-            <p>Buffered jumps trigger on the first possible frame. Staying grounded refreshes the buffer.</p>
+            <h2>Flight Manual</h2>
+            <p>Keep moving to improve your aim cone and catch bonus cores before the rift intensifies.</p>
           </div>
           <ul class="tips">
-            <li>Press Space, W, Up/Down Arrow, or tap to jump. Hold to queue a buffer for the next edge.</li>
-            <li>R resets instantly. P or the Pause button toggles slow-motion inspect mode.</li>
-            <li>Coyote time lets you step off a block for ~0.12s and still launch.</li>
-            <li>Double-tap on touch or hit the Right Arrow mid-air to unleash a dash burst that covers bigger gaps; landing refuels it.</li>
-            <li>The Heat Flow stat shows blocks per second — more heat means bigger gaps.</li>
-            <li>The stopwatch never lies: push for longer survival streaks without touching the lava.</li>
-            <li>Landing every ~250m drops a checkpoint flag. Falls rewind you to the latest unspent flag before ending the run.</li>
+            <li>Hold <strong>W</strong> to surge toward the rift and squeeze enemies together for splash hits.</li>
+            <li>Use <strong>A/D</strong> strafes to dodge tracer fire and line up distant drones.</li>
+            <li>Space, mouse/touch, or the Pulse button unleashes a rail of plasma. Holding the input auto-fires when cooled.</li>
+            <li>Every cleared drone adds to the threat meter. Survive long enough and the wave escalates with faster patterns.</li>
+            <li>Integrity reaches zero when hostiles breach the runway — redeploy immediately to chase a better score.</li>
+            <li>Mission time never stops ticking. Pause to strategize, not to cool down.</li>
           </ul>
           <div class="hotkeys">
-            <p><span class="key">Space/W/↑/↓</span> jump & buffer</p>
-            <p><span class="key">R</span> reset run</p>
-            <p><span class="key">P</span> pause/resume</p>
-            <p><span class="key">Click/Touch</span> jump</p>
-            <p><span class="key">→ (Right Arrow)</span> dash burst</p>
-            <p><span class="key">Double Tap</span> touch dash</p>
+            <p><span class="key">W / S</span> advance or brake</p>
+            <p><span class="key">A / D</span> strafe left & right</p>
+            <p><span class="key">Space</span> fire pulse</p>
+            <p><span class="key">Click / Touch</span> fire pulse</p>
+            <p><span class="key">R</span> redeploy</p>
+            <p><span class="key">P</span> pause tactical feed</p>
           </div>
         </section>
       </main>
     </div>
 
     <div class="corner-stopwatch" aria-live="off">
-      <p class="label">Run Time</p>
-      <p id="corner-timer" class="value">0:00.0</p>
+      <p class="label">Uptime</p>
+      <p id="corner-timer" class="value">0:00</p>
     </div>
 
     <script src="./app.js" type="module"></script>
