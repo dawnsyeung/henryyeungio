@@ -55,12 +55,26 @@ const state = {
 
 const players = [
   createPlayer({
-    label: "Runner",
+    label: "Runner One",
     x: 160,
     bodyColor: "#fefefe",
     accentColor: "#5ef5ff",
   }),
+  createPlayer({
+    label: "Runner Two",
+    x: 236,
+    bodyColor: "#ffe7fb",
+    accentColor: "#ff84d8",
+  }),
 ];
+
+const jumpKeyBindings = new Map([
+  ["Space", 0],
+  ["KeyW", 0],
+  ["ArrowUp", 1],
+  ["KeyL", 1],
+  ["Numpad8", 1],
+]);
 
 init();
 
@@ -91,19 +105,15 @@ function attachEvents() {
 
   canvas.addEventListener("pointerdown", (event) => {
     event.preventDefault();
-    handleJumpRequest();
+    handleJumpRequest(0);
   });
 
   window.addEventListener("keydown", (event) => {
     if (event.repeat) return;
-    if (
-      event.code === "Space" ||
-      event.code === "KeyW" ||
-      event.code === "ArrowUp" ||
-      event.code === "Numpad8"
-    ) {
+    const jumpPlayerIndex = jumpKeyBindings.get(event.code);
+    if (jumpPlayerIndex !== undefined) {
       event.preventDefault();
-      handleJumpRequest();
+      handleJumpRequest(jumpPlayerIndex);
       return;
     }
     if (event.code === "KeyP") {
@@ -303,8 +313,8 @@ function spawnObstacle() {
   state.spawnTimer = config.spawnBase - cadenceTrim + Math.random() * config.spawnVariance;
 }
 
-function handleJumpRequest() {
-  const player = players[0];
+function handleJumpRequest(playerIndex = 0) {
+  const player = players[playerIndex];
   if (!player) return;
   if (state.phase === "idle" || state.phase === "over") {
     startRun();
@@ -332,6 +342,7 @@ function startRun() {
   state.currentSpeed = config.baseSpeed;
   state.jumpFlash = 0;
   state.loadRatio = 0;
+  state.lastLoser = null;
   placePlayers();
   updateScoreUI();
   updateSpeedReadout();
@@ -349,11 +360,12 @@ function resetToIdle(message) {
   state.currentSpeed = config.baseSpeed;
   state.jumpFlash = 0;
   state.loadRatio = 0;
+  state.lastLoser = null;
   placePlayers();
   updateScoreUI();
   updateSpeedReadout();
   updateLoadBar(0);
-  setStatusText(message);
+  setStatusText(message ?? getStatusMessage());
   updateControls();
 }
 
@@ -436,7 +448,7 @@ function setStatusText(message) {
 }
 
 function getStatusMessage() {
-  const controlHelp = "Jump with Space, click, or Arrow Up.";
+  const controlHelp = "Runner One — Space/W/Click. Runner Two — Arrow Up/L/Numpad8.";
   if (state.phase === "idle") return `Tap Play to begin. ${controlHelp}`;
   if (state.phase === "playing") {
     return state.paused ? "Paused — press Play or P." : controlHelp;
