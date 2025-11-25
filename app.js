@@ -27,6 +27,10 @@ const config = {
   platformWidthMin: 140,
   platformWidthMax: 240,
   platformVerticalVariance: 90,
+  terrainWaveAmplitude: 120,
+  terrainWaveLength: 1800,
+  terrainWaveSecondaryAmplitude: 50,
+  terrainWaveSecondaryLength: 640,
   trailInterval: 0.08,
   checkpointInterval: 250,
   checkpointToastDuration: 2.5,
@@ -140,6 +144,20 @@ function createPlatform(x, y, width) {
   };
 }
 
+function getTerrainBaseY(worldX) {
+  if (!canvas) return 0;
+  const baseline = canvas.height - 210;
+  const mainWave =
+    Math.sin((worldX / config.terrainWaveLength) * Math.PI * 2) * config.terrainWaveAmplitude;
+  const secondaryWave =
+    Math.sin((worldX / config.terrainWaveSecondaryLength) * Math.PI * 2 + worldX * 0.0009) *
+    config.terrainWaveSecondaryAmplitude;
+  const rawY = baseline - mainWave - secondaryWave;
+  const minY = canvas.height - 400;
+  const maxY = canvas.height - 130;
+  return clamp(rawY, minY, maxY);
+}
+
 function resetGame() {
   state.player = createPlayer();
   state.platforms = [];
@@ -179,9 +197,9 @@ function resetGame() {
 }
 
 function seedWorld() {
-  const baseY = canvas.height - 110;
-  state.platforms.push(createPlatform(-320, baseY, 720));
-  state.spawnX = 420;
+  const startPlatform = createPlatform(-320, getTerrainBaseY(-320), 720);
+  state.platforms.push(startPlatform);
+  state.spawnX = startPlatform.x + startPlatform.width;
   ensurePlatforms();
 }
 
@@ -200,9 +218,10 @@ function ensurePlatforms() {
     state.lastPlatformGap = gap;
     const width = randomRange(config.platformWidthMin, config.platformWidthMax);
     const variance = randomRange(-config.platformVerticalVariance, config.platformVerticalVariance);
-    const minY = canvas.height - 320;
-    const maxY = canvas.height - 140;
-    const y = clamp(prev.y + variance, minY, maxY);
+    const targetX = state.spawnX + gap + width / 2;
+    const terrainY = getTerrainBaseY(targetX);
+    const blendedY = lerp(prev.y, terrainY, 0.35);
+    const y = clamp(blendedY + variance * 0.6, canvas.height - 400, canvas.height - 130);
     const platform = createPlatform(state.spawnX + gap, y, width);
     state.platforms.push(platform);
     state.spawnX = platform.x + platform.width;
