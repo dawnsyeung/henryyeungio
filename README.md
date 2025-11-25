@@ -1,29 +1,27 @@
-# Molten Stick Sprint
+# Helix Ember: First-Person Breach
 
-Molten Stick Sprint is a canvas-rendered parkour challenge where a squad of neon stick figures races across basalt pads hanging over a glowing lava trench. Procedural trees breeze by in the background while a built-in stopwatch tracks how long you’ve survived the heat.
+Helix Ember is a browser-based 3D breach scenario powered by Three.js. You drop into a first-person camera, wield a rifle, and stare down squads of armed humans that sweep toward your position. Tight pointer-lock controls, wave escalation, and a neon arena keep every run tense.
 
 ## Getting Started
 
-1. Serve the root directory (or just open `index.html` in a browser).
+1. Serve the root directory (or open `index.html` directly in a modern browser).
    ```bash
    python -m http.server 4173
    ```
-2. The runner automatically surges forward. Press **Space**, **W**, **Up Arrow**, **Down Arrow**, or tap the canvas to jump.
-3. Hold the jump input to buffer the next leap — it fires on the first possible frame after touching ground.
-4. Tap **R** or hit **Reset Run** to restart. **P** (or the Pause button) freezes the action without clearing the stopwatch.
-5. Double-tap (touch) or press **Shift** / **D** mid-air to unleash a dash burst that stretches over wider gaps; landing reloads the dash charge.
+2. Click the canvas or press the **Prime** button to lock the cursor and arm the rifle.
+3. Use **WASD** to move, **mouse** to aim, **Shift** to sprint, and **Left Click / Space** to fire.
+4. **R** instantly redeploys, while **P** (or the Pause button) unlocks the visor and pauses the sim.
 
 ## Features
 
-- Lava river with animated waves, ember sprites, and parallax tree lines to set the canyon vibe.
-- Stick-figure rendering system (player + ghost runners) that animates arms, legs, and glowing trails.
-- Stopwatch HUD alongside distance, best run, heat flow (speed), and checkpoint banking.
-- Mid-air dash system with particle bursts, gravity dampening, and a HUD charge indicator for clutch saves.
-- Jump buffering, coyote time, dust FX, and trail particles for responsive inputs and feedback.
-- Persistent best distance, checkpoints every ~250 meters, and optional respawn delays.
+- Three.js-powered arena with volumetric fog, neon strips, and animated cover blocks.
+- Pointer-lock first-person camera plus a reactive weapon model with recoil, muzzle flashes, and tracers.
+- Enemy humans built from modular meshes, each carrying rifles that fire back with projectile logic.
+- Wave escalations, pressure meter, and HUD panels for armor, time, eliminations, and weapon state.
+- Particle bursts, hit sparks, and crosshair feedback to highlight every successful shot.
 
 ## Customizing
 
-- Game feel lives in the `config` block inside `app.js` — tweak gravity, lava height, tree layers, checkpoint spacing, and more.
-- Platform generation rules are in `ensurePlatforms`. Adjust gaps, heights, or noise for harder/easier runs.
-- Visual styling (panels, typography, buttons) hangs out in `styles.css`, while canvas colors are controlled in the `draw*` helpers in `app.js`.
+- All tuning knobs (speeds, health, spawn cadence, weapon cooldowns, arena bounds) live in the `config` block at the top of `app.js`.
+- Enemy visuals and weapon styling can be tweaked inside `createTrooperMesh` and `createPlayerWeapon`.
+- UI copy and layout remain in `index.html`, while panel/glow styling is handled in `styles.css`.
