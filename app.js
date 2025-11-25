@@ -12,7 +12,7 @@ const bestStorageKey = "blockstep-best";
 const config = {
   gravity: 2400,
   jumpVelocity: 980,
-  baseSpeed: 280,
+  baseSpeed: 308,
   coyoteTime: 0.12,
   jumpBuffer: 0.16,
   platformHeight: 56,
