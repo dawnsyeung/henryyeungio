@@ -20,6 +20,7 @@ const controls = {
   pause: document.getElementById("pause-btn"),
   reset: document.getElementById("reset-btn"),
 };
+const modeButtons = Array.from(document.querySelectorAll("#mode-toggle [data-mode]"));
 
 const BEST_KEY = "skyboundSpringsBest";
 
@@ -43,24 +44,31 @@ const config = {
 const state = {
   phase: "idle",
   paused: true,
-  obstacles: [],
-  spawnTimer: config.spawnBase,
   score: 0,
   best: loadBestScore(),
   currentSpeed: config.baseSpeed,
   lastLoser: null,
   lastTime: 0,
   loadRatio: 0,
+  mode: "solo",
 };
 
-const players = [
-  createPlayer({
-    label: "Runner",
+const playerPresets = [
+  {
+    label: "Runner One",
     x: 160,
     bodyColor: "#fefefe",
     accentColor: "#5ef5ff",
-  }),
+  },
+  {
+    label: "Runner Two",
+    x: 160,
+    bodyColor: "#ffd8f7",
+    accentColor: "#ff84d8",
+  },
 ];
+
+const players = playerPresets.map((preset) => createPlayer(preset));
 
 init();
 
@@ -91,19 +99,20 @@ function attachEvents() {
 
   canvas.addEventListener("pointerdown", (event) => {
     event.preventDefault();
-    handleJumpRequest();
+    handleJumpRequest(0);
   });
 
   window.addEventListener("keydown", (event) => {
     if (event.repeat) return;
-    if (
-      event.code === "Space" ||
-      event.code === "KeyW" ||
-      event.code === "ArrowUp" ||
-      event.code === "Numpad8"
-    ) {
+    if (event.code === "Space" || event.code === "KeyW") {
       event.preventDefault();
-      handleJumpRequest();
+      handleJumpRequest(0);
+      return;
+    }
+    if (event.code === "ArrowUp" || event.code === "Numpad8") {
+      event.preventDefault();
+      const targetIndex = state.mode === "duo" ? 1 : 0;
+      handleJumpRequest(targetIndex);
       return;
     }
     if (event.code === "KeyP") {
@@ -124,6 +133,13 @@ function attachEvents() {
       setStatusText("Paused — focus lost.");
     }
   });
+
+  for (const button of modeButtons) {
+    button.addEventListener("click", () => {
+      const nextMode = button.dataset.mode === "duo" ? "duo" : "solo";
+      setPlayerMode(nextMode);
+    });
+  }
 }
 
 function gameLoop(timestamp = 0) {
@@ -139,90 +155,130 @@ function gameLoop(timestamp = 0) {
 }
 
 function update(dt) {
-  const ground = groundLine();
-  for (const player of players) {
-    player.vy += config.gravity * dt;
-    player.y += player.vy * dt;
+  const activePlayersList = getActivePlayers();
+  if (activePlayersList.length === 0) return;
+  const laneHeight = getLaneHeight(activePlayersList.length);
+  let aggregateScore = 0;
+  let aggregateLoadRatio = 0;
 
-    if (player.y + player.height >= ground) {
-      player.y = ground - player.height;
-      player.vy = 0;
-      player.grounded = true;
+  for (const player of activePlayersList) {
+    applyMotion(player, dt, laneHeight);
+
+    const difficulty = Math.min(player.score / config.difficultyScoreSpan, config.maxDifficulty);
+    player.currentSpeed = config.baseSpeed + config.speedRamp * difficulty;
+    player.loadRatio = config.maxDifficulty > 0 ? difficulty / config.maxDifficulty : 0;
+    aggregateLoadRatio = Math.max(aggregateLoadRatio, player.loadRatio);
+
+    player.spawnTimer -= dt;
+    if (player.spawnTimer <= 0) {
+      spawnObstacle(player, laneHeight);
     }
 
-    player.jumpFlash = Math.max(0, player.jumpFlash - dt);
-  }
+    player.obstacles = player.obstacles.filter((obstacle) => {
+      obstacle.x -= player.currentSpeed * dt;
+      return obstacle.x + obstacle.width > -20;
+    });
 
-  const difficulty = Math.min(state.score / config.difficultyScoreSpan, config.maxDifficulty);
-  state.currentSpeed = config.baseSpeed + config.speedRamp * difficulty;
-  state.loadRatio = config.maxDifficulty > 0 ? difficulty / config.maxDifficulty : 0;
-
-  state.spawnTimer -= dt;
-  if (state.spawnTimer <= 0) {
-    spawnObstacle();
-  }
-
-  state.obstacles = state.obstacles.filter((obstacle) => {
-    obstacle.x -= state.currentSpeed * dt;
-    return obstacle.x + obstacle.width > -20;
-  });
-
-  for (const obstacle of state.obstacles) {
-    for (const player of players) {
+    for (const obstacle of player.obstacles) {
       if (intersectsPlayer(player, obstacle)) {
         endRun(player);
         return;
       }
     }
+
+    player.score += dt * player.currentSpeed * config.scoreRate;
+    aggregateScore = Math.max(aggregateScore, player.score);
   }
 
-  state.score += dt * state.currentSpeed * config.scoreRate;
+  state.score = aggregateScore;
+  state.currentSpeed = activePlayersList[0]?.currentSpeed ?? config.baseSpeed;
+  state.loadRatio = aggregateLoadRatio;
+
   updateScoreUI();
   updateSpeedReadout();
   updateLoadBar();
 }
 
-function draw() {
-  const { width, height } = canvas;
-  ctx.clearRect(0, 0, width, height);
+function applyMotion(player, dt, laneHeight) {
+  player.vy += config.gravity * dt;
+  player.y += player.vy * dt;
 
-  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  const ground = groundLine(laneHeight);
+  if (player.y + player.height >= ground) {
+    player.y = ground - player.height;
+    player.vy = 0;
+    player.grounded = true;
+  } else {
+    player.grounded = false;
+  }
+
+  player.jumpFlash = Math.max(0, player.jumpFlash - dt);
+}
+
+function draw() {
+  const activePlayersList = getActivePlayers();
+  if (activePlayersList.length === 0) return;
+  const laneHeight = getLaneHeight(activePlayersList.length);
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  activePlayersList.forEach((player, index) => {
+    const offsetY = laneHeight * index;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, offsetY, canvas.width, laneHeight);
+    ctx.clip();
+    ctx.translate(0, offsetY);
+    drawLane(player, laneHeight);
+    ctx.restore();
+
+    if (state.mode === "duo" && index === 0) {
+      drawSplitDivider(offsetY + laneHeight);
+    }
+  });
+
+  drawOverlay();
+}
+
+function drawLane(player, laneHeight) {
+  drawLaneBackground(laneHeight);
+  drawBackgroundStreaks(player.score, laneHeight);
+  drawGround(laneHeight);
+  drawObstacles(player);
+  drawPlayer(player);
+  drawJumpFlash(player, laneHeight);
+}
+
+function drawLaneBackground(laneHeight) {
+  const gradient = ctx.createLinearGradient(0, 0, 0, laneHeight);
   gradient.addColorStop(0, "#162452");
   gradient.addColorStop(0.5, "#0c1430");
   gradient.addColorStop(1, "#050714");
   ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
-
-  drawBackgroundStreaks();
-  drawGround();
-  drawObstacles();
-  drawPlayers();
-  drawJumpFlash();
-  drawOverlay();
+  ctx.fillRect(0, 0, canvas.width, laneHeight);
 }
 
-function drawBackgroundStreaks() {
+function drawBackgroundStreaks(score = state.score, laneHeight = canvas.height) {
   ctx.save();
   ctx.strokeStyle = "rgba(94,245,255,0.12)";
   ctx.lineWidth = 1;
   const width = canvas.width;
-  const height = canvas.height;
-  const offset = (state.score * 2) % width;
+  const offset = (score * 2) % width;
   for (let i = -1; i < 3; i += 1) {
     ctx.beginPath();
     const x = offset + i * (width / 3);
     ctx.moveTo(x, 0);
-    ctx.lineTo(x - width * 0.4, height);
+    ctx.lineTo(x - width * 0.4, laneHeight);
     ctx.stroke();
   }
   ctx.restore();
 }
 
-function drawGround() {
-  const ground = groundLine();
+function drawGround(laneHeight = canvas.height) {
+  const ground = groundLine(laneHeight);
   ctx.save();
   ctx.fillStyle = "#060b1d";
-  ctx.fillRect(0, ground, canvas.width, canvas.height - ground);
+  ctx.fillRect(0, ground, canvas.width, laneHeight - ground);
   ctx.fillStyle = "rgba(94,245,255,0.08)";
   ctx.fillRect(0, ground - 10, canvas.width, 10);
   ctx.strokeStyle = "rgba(94,245,255,0.45)";
@@ -234,17 +290,11 @@ function drawGround() {
   ctx.restore();
 }
 
-function drawObstacles() {
-  for (const obstacle of state.obstacles) {
+function drawObstacles(player) {
+  for (const obstacle of player.obstacles) {
     drawRoundedRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height, 10, obstacle.color);
     ctx.fillStyle = "rgba(255,255,255,0.12)";
     ctx.fillRect(obstacle.x + 4, obstacle.y + 4, obstacle.width - 8, 2);
-  }
-}
-
-function drawPlayers() {
-  for (const player of players) {
-    drawPlayer(player);
   }
 }
 
@@ -259,21 +309,31 @@ function drawPlayer(player) {
   ctx.restore();
 }
 
-function drawJumpFlash() {
+function drawJumpFlash(player, laneHeight) {
+  if (player.jumpFlash <= 0) return;
   ctx.save();
-  for (const player of players) {
-    if (player.jumpFlash <= 0) continue;
-    const ratio = player.jumpFlash / config.jumpFlashLife;
-    ctx.strokeStyle = `rgba(94,245,255,${ratio * 0.9})`;
-    ctx.lineWidth = 6 * ratio;
-    const cx = player.x + player.width / 2;
-    const cy = groundLine();
-    const rx = 24 + (1 - ratio) * 50;
-    const ry = 10 + (1 - ratio) * 16;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + 6, rx, ry, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  }
+  const ratio = player.jumpFlash / config.jumpFlashLife;
+  ctx.strokeStyle = `rgba(94,245,255,${ratio * 0.9})`;
+  ctx.lineWidth = 6 * ratio;
+  const cx = player.x + player.width / 2;
+  const cy = groundLine(laneHeight);
+  const rx = 24 + (1 - ratio) * 50;
+  const ry = 10 + (1 - ratio) * 16;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 6, rx, ry, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawSplitDivider(yPosition) {
+  ctx.save();
+  ctx.strokeStyle = "rgba(94,245,255,0.28)";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 10]);
+  ctx.beginPath();
+  ctx.moveTo(0, yPosition);
+  ctx.lineTo(canvas.width, yPosition);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -292,19 +352,20 @@ function drawOverlay() {
   ctx.restore();
 }
 
-function spawnObstacle() {
+function spawnObstacle(player, laneHeight) {
   const height = rand(config.obstacleHeight.min, config.obstacleHeight.max);
   const width = rand(config.obstacleWidth.min, config.obstacleWidth.max);
   const x = canvas.width + width;
-  const y = groundLine() - height;
+  const y = groundLine(laneHeight) - height;
   const color = config.colors[Math.floor(Math.random() * config.colors.length)];
-  state.obstacles.push({ x, y, width, height, color });
-  const cadenceTrim = Math.min(state.score / 700, 0.6);
-  state.spawnTimer = config.spawnBase - cadenceTrim + Math.random() * config.spawnVariance;
+  player.obstacles.push({ x, y, width, height, color });
+  const cadenceTrim = Math.min(player.score / 700, 0.6);
+  player.spawnTimer = config.spawnBase - cadenceTrim + Math.random() * config.spawnVariance;
 }
 
-function handleJumpRequest() {
-  const player = players[0];
+function handleJumpRequest(playerIndex = 0) {
+  const activePlayersList = getActivePlayers();
+  const player = activePlayersList[playerIndex] ?? activePlayersList[0];
   if (!player) return;
   if (state.phase === "idle" || state.phase === "over") {
     startRun();
@@ -327,12 +388,10 @@ function startRun() {
   state.phase = "playing";
   state.paused = false;
   state.score = 0;
-  state.obstacles = [];
-  state.spawnTimer = 0.8;
   state.currentSpeed = config.baseSpeed;
-  state.jumpFlash = 0;
   state.loadRatio = 0;
-  placePlayers();
+  state.lastLoser = null;
+  resetPlayersForMode(0.8);
   updateScoreUI();
   updateSpeedReadout();
   updateLoadBar(0);
@@ -343,17 +402,15 @@ function startRun() {
 function resetToIdle(message) {
   state.phase = "idle";
   state.paused = true;
-  state.obstacles = [];
-  state.spawnTimer = config.spawnBase;
   state.score = 0;
   state.currentSpeed = config.baseSpeed;
-  state.jumpFlash = 0;
   state.loadRatio = 0;
-  placePlayers();
+  state.lastLoser = null;
+  resetPlayersForMode(config.spawnBase);
   updateScoreUI();
   updateSpeedReadout();
   updateLoadBar(0);
-  setStatusText(message);
+  setStatusText(message ?? getStatusMessage());
   updateControls();
 }
 
@@ -427,6 +484,7 @@ function updateControls() {
     }
     controls.play.textContent = label;
   }
+  updateModeButtons();
 }
 
 function setStatusText(message) {
@@ -435,8 +493,22 @@ function setStatusText(message) {
   }
 }
 
+function updateModeButtons() {
+  for (const button of modeButtons) {
+    if (!button) continue;
+    const targetMode = button.dataset.mode === "duo" ? "duo" : "solo";
+    const isActive = targetMode === state.mode;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+    button.disabled = state.phase === "playing";
+  }
+}
+
 function getStatusMessage() {
-  const controlHelp = "Jump with Space, click, or Arrow Up.";
+  const controlHelp =
+    state.mode === "duo"
+      ? "P1: Space or click • P2: Arrow Up or Numpad 8."
+      : "Jump with Space, click, or Arrow Up.";
   if (state.phase === "idle") return `Tap Play to begin. ${controlHelp}`;
   if (state.phase === "playing") {
     return state.paused ? "Paused — press Play or P." : controlHelp;
@@ -445,18 +517,47 @@ function getStatusMessage() {
   return `${loserMessage} Tap Play to retry.`;
 }
 
-function placePlayers() {
-  const ground = groundLine();
+function resetPlayersForMode(initialSpawn = config.spawnBase) {
+  const laneHeight = getLaneHeight(state.mode === "duo" ? 2 : 1);
   for (const player of players) {
-    player.y = ground - player.height;
-    player.vy = 0;
+    resetPlayerLane(player, initialSpawn);
+    player.x = player.startX;
+    player.y = groundLine(laneHeight) - player.height;
     player.grounded = true;
-    player.jumpFlash = 0;
   }
 }
 
-function groundLine() {
-  return canvas.height - config.groundOffset;
+function resetPlayerLane(player, initialSpawn = config.spawnBase) {
+  player.obstacles = [];
+  player.spawnTimer = initialSpawn;
+  player.score = 0;
+  player.currentSpeed = config.baseSpeed;
+  player.loadRatio = 0;
+  player.jumpFlash = 0;
+  player.vy = 0;
+}
+
+function getActivePlayers() {
+  const count = state.mode === "duo" ? 2 : 1;
+  return players.slice(0, count);
+}
+
+function getLaneHeight(activeCount = getActivePlayers().length || 1) {
+  const lanes = Math.max(1, activeCount);
+  return canvas.height / lanes;
+}
+
+function setPlayerMode(nextMode) {
+  const normalized = nextMode === "duo" ? "duo" : "solo";
+  if (state.mode === normalized) return;
+  if (state.phase === "playing") return;
+  state.mode = normalized;
+  resetToIdle();
+  updateModeButtons();
+}
+
+function groundLine(laneHeight = canvas.height) {
+  return laneHeight - config.groundOffset;
 }
 
 function drawRoundedRect(x, y, width, height, radius, color) {
@@ -490,6 +591,7 @@ function intersectsPlayer(player, obstacle) {
 function createPlayer({ label, x, bodyColor, accentColor }) {
   return {
     label,
+    startX: x,
     width: 46,
     height: 54,
     x,
@@ -499,6 +601,11 @@ function createPlayer({ label, x, bodyColor, accentColor }) {
     bodyColor,
     accentColor,
     jumpFlash: 0,
+    obstacles: [],
+    spawnTimer: config.spawnBase,
+    score: 0,
+    currentSpeed: config.baseSpeed,
+    loadRatio: 0,
   };
 }
 

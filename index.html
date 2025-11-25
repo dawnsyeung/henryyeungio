@@ -59,18 +59,29 @@
             <div id="load-fill" class="load-fill"></div>
           </div>
         </div>
+      <div id="mode-toggle" class="mode-toggle" role="group" aria-label="Player mode">
+        <div class="mode-toggle-head">
+          <p class="label">Player Mode</p>
+          <p class="mode-blurb">Swap between a solo lane or split-screen dual run.</p>
+        </div>
+        <div class="mode-toggle-buttons">
+          <button type="button" class="mode-btn active" data-mode="solo">Solo Run</button>
+          <button type="button" class="mode-btn" data-mode="duo">Dual Split</button>
+        </div>
+      </div>
       </header>
 
       <main class="panel playfield">
         <div class="canvas-headline">
           <div>
             <h2>Jumping Lane</h2>
-            <p>Tap, click, or press space to hop over neon blocks. Each second alive nudges the speed higher.</p>
+          <p>Kick off a classic solo dash or enable two-player mode for mirrored split-screen chaos.</p>
           </div>
           <div class="hotkeys">
-            <p>Jump <span class="key">Space</span> or <span class="key">Click</span></p>
-            <p>Alt jump <span class="key">Arrow&nbsp;Up</span> or <span class="key">Numpad&nbsp;8</span></p>
+          <p>P1 jump <span class="key">Space</span> / <span class="key">Click</span></p>
+          <p>P2 jump <span class="key">Arrow&nbsp;Up</span> / <span class="key">Numpad&nbsp;8</span></p>
             <p><span class="key">P</span> pause / resume</p>
+          <p><span class="key">R</span> restart</p>
           </div>
         </div>
         <canvas
