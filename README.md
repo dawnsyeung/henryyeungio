@@ -1,28 +1,27 @@
-# Blockstep Parkour
+# Molten Stick Sprint
 
-An endless, canvas-rendered parkour runner. Sprint across floating voxels, queue jumps before you leave a block, and keep your speed meter climbing to survive longer gaps.
+Molten Stick Sprint is a canvas-rendered parkour challenge where a squad of neon stick figures races across basalt pads hanging over a glowing lava trench. Procedural trees breeze by in the background while a built-in stopwatch tracks how long you’ve survived the heat.
 
 ## Getting Started
 
-1. Serve the directory or open `index.html` in your browser.
+1. Serve the root directory (or just open `index.html` in a browser).
    ```bash
    python -m http.server 4173
    ```
-2. The runner auto-moves. Press **Space**, **W**, **Up Arrow**, or tap the canvas to jump.
-3. Hold the jump key to buffer the next jump — it fires on the first frame you can leave the ground.
-4. Press **R** or the Reset Run button to restart instantly. Use **P**/Pause to freeze the action.
+2. The runner automatically surges forward. Press **Space**, **W**, **Up Arrow**, **Down Arrow**, or tap the canvas to jump.
+3. Hold the jump input to buffer the next leap — it fires on the first possible frame after touching ground.
+4. Tap **R** or hit **Reset Run** to restart. **P** (or the Pause button) freezes the action without clearing the stopwatch.
 
 ## Features
 
-- Procedurally generated platforms with subtle height variance and escalating gaps.
-- Momentum meter that translates directly into larger jumps and spacing.
-- Coyote time (~0.12s) and jump buffering for responsive inputs, plus dust FX on landings.
-- Local best distance stored automatically so you can chase PBs between sessions.
-- Checkpoint flags drop every ~250m; each banked flag grants a single rewind to that spot before the run truly ends.
+- Lava river with animated waves, ember sprites, and parallax tree lines to set the canyon vibe.
+- Stick-figure rendering system (player + ghost runners) that animates arms, legs, and glowing trails.
+- Stopwatch HUD alongside distance, best run, heat flow (speed), and checkpoint banking.
+- Jump buffering, coyote time, dust FX, and trail particles for responsive inputs and feedback.
+- Persistent best distance, checkpoints every ~250 meters, and optional respawn delays.
 
 ## Customizing
 
-- Tune gravity, jump force, speed ramp, or particle behavior in `config` within `app.js`.
-- Adjust checkpoint spacing, toast durations, or respawn flash timing via the same config block.
-- Adjust generation rules inside `ensurePlatforms` if you want taller peaks or wider gaps.
-- Style the HUD and track colors by editing CSS variables in `styles.css` or the `draw*` helpers in `app.js`.
+- Game feel lives in the `config` block inside `app.js` — tweak gravity, lava height, tree layers, checkpoint spacing, and more.
+- Platform generation rules are in `ensurePlatforms`. Adjust gaps, heights, or noise for harder/easier runs.
+- Visual styling (panels, typography, buttons) hangs out in `styles.css`, while canvas colors are controlled in the `draw*` helpers in `app.js`.

@@ -4,6 +4,7 @@ const distanceEl = document.getElementById("distance");
 const bestEl = document.getElementById("best");
 const paceEl = document.getElementById("pace");
 const checkpointEl = document.getElementById("checkpoint");
+const timerEl = document.getElementById("timer");
 const resetBtn = document.getElementById("reset-btn");
 const pauseBtn = document.getElementById("pause-btn");
 const bestStorageKey = "blockstep-best";
@@ -21,7 +22,16 @@ const config = {
   checkpointToastDuration: 2.5,
   respawnFlashDuration: 0.6,
   checkpointRespawnDelay: 2,
+  lavaHeight: 160,
+  lavaWaveAmplitude: 18,
+  lavaWaveLength: 220,
+  forestBaseHeight: 110,
 };
+
+const ghostRunners = [
+  { offsetX: -180, offsetY: 18, scale: 0.9, speed: 0.9, opacity: 0.35, phase: 0 },
+  { offsetX: 220, offsetY: -6, scale: 1.05, speed: 1.15, opacity: 0.45, phase: Math.PI / 2 },
+];
 
 const state = {
   player: null,
@@ -50,6 +60,7 @@ const state = {
   lastGroundPlatform: null,
   maxDistanceThisRun: 0,
   pendingRespawn: null,
+  elapsed: 0,
 };
 
 function loadBestDistance() {
@@ -82,12 +93,19 @@ function formatSeconds(value) {
   return fixed.endsWith(".0") ? fixed.slice(0, -2) : fixed;
 }
 
+function formatStopwatch(seconds = 0) {
+  const minutes = Math.floor(seconds / 60);
+  const sec = Math.floor(seconds % 60);
+  const tenths = Math.floor((seconds % 1) * 10);
+  return `${minutes}:${String(sec).padStart(2, "0")}.${tenths}`;
+}
+
 function createPlayer() {
   return {
     x: 80,
-    y: canvas.height - 220,
-    width: 44,
-    height: 44,
+    y: canvas.height - 240,
+    width: 32,
+    height: 58,
     vy: 0,
   };
 }
@@ -127,6 +145,7 @@ function resetGame() {
   state.lastGroundPlatform = null;
   state.maxDistanceThisRun = 0;
   state.pendingRespawn = null;
+  state.elapsed = 0;
   seedWorld();
   updateHud();
   setPauseLabel();
@@ -185,6 +204,7 @@ function update(timestamp) {
 }
 
 function updateGame(dt) {
+  state.elapsed += dt;
   state.jumpGrace = Math.max(0, state.jumpGrace - dt);
   state.jumpBufferTimer = Math.max(0, state.jumpBufferTimer - dt);
 
@@ -385,7 +405,7 @@ function spawnTrailDust() {
     vy: randomRange(40, 90),
     life: 0,
     maxLife: 0.25,
-    color: "rgba(255,255,255,0.35)",
+    color: "rgba(255, 166, 102, 0.45)",
     size: randomRange(3, 6),
   });
 }
@@ -424,7 +444,7 @@ function emitLandingDust(x, y) {
       vy: Math.sin(angle) * speed * 0.6,
       life: 0,
       maxLife: 0.45,
-      color: "rgba(240, 247, 255, 0.45)",
+      color: "rgba(255, 196, 140, 0.55)",
       size: randomRange(2, 4),
     });
   }
@@ -461,6 +481,7 @@ function setPauseLabel() {
 }
 
 function updateHud() {
+  if (timerEl) timerEl.textContent = formatStopwatch(state.elapsed);
   if (distanceEl) distanceEl.textContent = `${state.distance}m`;
   if (bestEl) bestEl.textContent = `${state.bestDistance}m`;
   if (paceEl) {
@@ -484,9 +505,11 @@ function render(time = 0) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawBackground(time);
   drawParallax(time);
+  drawLavaRiver(time);
   drawPlatforms();
   drawCheckpoints(time);
   drawParticles();
+  drawGhostRunners(time);
   drawPlayer(time);
   drawSpeedBar();
   drawCheckpointToast();
@@ -501,36 +524,95 @@ function render(time = 0) {
 
 function drawBackground(time) {
   const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, "#041836");
-  gradient.addColorStop(0.6, "#082238");
-  gradient.addColorStop(1, "#0a1f24");
+  gradient.addColorStop(0, "#2b0b43");
+  gradient.addColorStop(0.45, "#3c0d2a");
+  gradient.addColorStop(0.82, "#1a050d");
+  gradient.addColorStop(1, "#080103");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.save();
-  ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
-  const stripeOffset = (time * 0.03) % 120;
-  for (let x = -stripeOffset; x < canvas.width; x += 120) {
-    ctx.fillRect(x, canvas.height - 140, 60, 140);
-  }
+  ctx.globalCompositeOperation = "screen";
+  const sunY = 140 + Math.sin(time * 0.0015) * 10;
+  ctx.fillStyle = "rgba(255, 121, 71, 0.2)";
+  ctx.beginPath();
+  ctx.arc(canvas.width * 0.72, sunY, 120, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255, 213, 175, 0.35)";
+  ctx.beginPath();
+  ctx.arc(canvas.width * 0.74, sunY, 36, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
 function drawParallax(time) {
   ctx.save();
-  ctx.fillStyle = "rgba(7, 32, 52, 0.6)";
-  const horizon = canvas.height - 160;
-  ctx.beginPath();
-  ctx.moveTo(0, horizon);
-  const waveOffset = (state.cameraX * 0.05 + time * 0.04) % canvas.width;
-  for (let x = -200; x < canvas.width + 200; x += 120) {
-    const peak = horizon + Math.sin((x + waveOffset) * 0.01) * 30;
-    ctx.lineTo(x, peak);
+  const forestFloor = canvas.height - config.lavaHeight - 20;
+  const layers = [
+    { color: "rgba(6, 32, 21, 0.55)", parallax: 0.12, height: config.forestBaseHeight + 30, noise: 26 },
+    { color: "rgba(17, 56, 33, 0.8)", parallax: 0.2, height: config.forestBaseHeight, noise: 18 },
+  ];
+
+  layers.forEach((layer, index) => {
+    const offset = ((state.cameraX * layer.parallax + time * (0.02 + index * 0.01)) % 80) - 80;
+    ctx.fillStyle = layer.color;
+    ctx.beginPath();
+    ctx.moveTo(-120, forestFloor);
+    for (let x = -120; x < canvas.width + 160; x += 40) {
+      const peakHeight = layer.height + Math.sin((x + offset) * 0.18) * layer.noise;
+      ctx.lineTo(x + 20, forestFloor - peakHeight);
+      ctx.lineTo(x + 40, forestFloor);
+    }
+    ctx.lineTo(canvas.width + 160, canvas.height);
+    ctx.lineTo(-120, canvas.height);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  ctx.restore();
+}
+
+function drawLavaRiver(time) {
+  const lavaTop = canvas.height - config.lavaHeight;
+  const gradient = ctx.createLinearGradient(0, lavaTop, 0, canvas.height);
+  gradient.addColorStop(0, "rgba(255, 120, 60, 0.85)");
+  gradient.addColorStop(0.4, "rgba(234, 60, 19, 0.9)");
+  gradient.addColorStop(1, "#350501");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, lavaTop, canvas.width, canvas.height - lavaTop);
+
+  const waves = 2;
+  for (let layer = 0; layer < waves; layer += 1) {
+    ctx.save();
+    ctx.strokeStyle = `rgba(255, 214, 158, ${0.4 - layer * 0.12})`;
+    ctx.lineWidth = 3 - layer * 0.6;
+    ctx.beginPath();
+    const amplitude = config.lavaWaveAmplitude - layer * 3;
+    const length = config.lavaWaveLength;
+    const offset = (state.cameraX * (0.25 + layer * 0.1) + time * (18 + layer * 6)) % length;
+    let firstPoint = true;
+    for (let x = -length; x <= canvas.width + length; x += 10) {
+      const waveY = lavaTop + 18 + layer * 16 + Math.sin((x + offset) * 0.025) * amplitude;
+      if (firstPoint) {
+        ctx.moveTo(x, waveY);
+        firstPoint = false;
+      } else {
+        ctx.lineTo(x, waveY);
+      }
+    }
+    ctx.stroke();
+    ctx.restore();
   }
-  ctx.lineTo(canvas.width, canvas.height);
-  ctx.lineTo(0, canvas.height);
-  ctx.closePath();
-  ctx.fill();
+
+  ctx.save();
+  ctx.fillStyle = "rgba(255, 240, 200, 0.28)";
+  for (let i = 0; i < 40; i += 1) {
+    const flicker = Math.sin((time * 0.008 + i) * 2.1);
+    const x = ((i * 97 + time * 0.4 + state.cameraX * 0.6) % (canvas.width + 80)) - 40;
+    const y = lavaTop + ((i * 37) % (canvas.height - lavaTop));
+    ctx.globalAlpha = 0.15 + Math.abs(flicker) * 0.35;
+    ctx.fillRect(x, y, 3, 10);
+  }
   ctx.restore();
 }
 
@@ -541,12 +623,17 @@ function drawPlatforms() {
     const screenY = platform.y;
     if (screenX + platform.width < -10 || screenX > canvas.width + 10) continue;
     const gradient = ctx.createLinearGradient(screenX, screenY, screenX, screenY + platform.height);
-    gradient.addColorStop(0, "#265c69");
-    gradient.addColorStop(1, "#14323c");
+    gradient.addColorStop(0, "#4c1f18");
+    gradient.addColorStop(1, "#1a0505");
     ctx.fillStyle = gradient;
     ctx.fillRect(screenX, screenY, platform.width, platform.height);
-    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.fillStyle = "rgba(255, 160, 96, 0.2)";
     ctx.fillRect(screenX, screenY, platform.width, 4);
+    ctx.fillStyle = "rgba(255, 120, 60, 0.25)";
+    ctx.fillRect(screenX, screenY + platform.height - 5, platform.width, 5);
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.4)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(screenX + 0.5, screenY + 0.5, platform.width - 1, platform.height - 1);
   }
   ctx.restore();
 }
@@ -577,24 +664,106 @@ function drawCheckpoints(time) {
 
 function drawPlayer(time) {
   const player = state.player;
-  const screenX = player.x - state.cameraX;
-  ctx.save();
-  ctx.translate(screenX, player.y);
-  ctx.fillStyle = "#f7fffd";
-  ctx.shadowColor = "rgba(123,255,155,0.45)";
-  ctx.shadowBlur = 18;
-  ctx.fillRect(0, 0, player.width, player.height);
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = "#ff8a5c";
-  ctx.fillRect(6, 8, player.width - 12, player.height / 2);
-  ctx.fillStyle = "#1b2d3f";
-  ctx.fillRect(6, player.height - 10, player.width - 12, 10);
+  const baseX = player.x - state.cameraX + player.width / 2;
+  const baseY = player.y + player.height;
+  drawStickFigure(baseX, baseY, {
+    time,
+    glow: true,
+    color: "#fff5ec",
+    accent: "#ffbe91",
+    scale: 1,
+    speed: 1,
+    lineWidth: 4,
+  });
+}
 
-  ctx.fillStyle = "rgba(255,255,255,0.35)";
-  const bob = Math.sin(time * 0.01) * 3;
+function drawGhostRunners(time) {
+  const player = state.player;
+  const baseX = player.x - state.cameraX + player.width / 2;
+  const baseY = player.y + player.height;
+  ghostRunners.forEach((ghost) => {
+    drawStickFigure(baseX + ghost.offsetX, baseY + ghost.offsetY, {
+      time,
+      color: `rgba(255,255,255,${ghost.opacity})`,
+      scale: ghost.scale,
+      speed: ghost.speed,
+      phase: ghost.phase,
+      lineWidth: 3,
+    });
+  });
+}
+
+function drawStickFigure(x, baseY, options = {}) {
+  const {
+    time = 0,
+    color = "#fff",
+    accent = null,
+    glow = false,
+    scale = 1,
+    speed = 1,
+    phase = 0,
+    lineWidth = 3,
+  } = options;
+  const timeline = time * 0.008 * speed + phase;
+  const stride = Math.sin(timeline) * 10 * scale;
+  const counterStride = Math.cos(timeline) * 8 * scale;
+  const torso = 30 * scale;
+  const headRadius = 8 * scale;
+  const shoulderY = baseY - torso - headRadius * 2;
+  const hipY = baseY - headRadius;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth * scale;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  if (glow) {
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = "rgba(255, 130, 80, 0.55)";
+  }
+
+  // Core spine
   ctx.beginPath();
-  ctx.arc(player.width / 2, -6 + bob, 6, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.moveTo(x, shoulderY);
+  ctx.lineTo(x, hipY - 6 * scale);
+  ctx.stroke();
+
+  // Arms
+  ctx.beginPath();
+  ctx.moveTo(x, shoulderY + 6 * scale);
+  ctx.lineTo(x - 12 * scale, shoulderY + 12 * scale + stride * 0.25);
+  ctx.moveTo(x, shoulderY + 6 * scale);
+  ctx.lineTo(x + 12 * scale, shoulderY + 12 * scale - stride * 0.25);
+  ctx.stroke();
+
+  // Legs
+  ctx.beginPath();
+  ctx.moveTo(x, hipY - 6 * scale);
+  ctx.lineTo(x - 10 * scale, hipY + 18 * scale + stride * 0.3);
+  ctx.moveTo(x, hipY - 6 * scale);
+  ctx.lineTo(x + 10 * scale, hipY + 18 * scale - stride * 0.3);
+  ctx.stroke();
+
+  // Head
+  ctx.shadowBlur = 0;
+  ctx.beginPath();
+  ctx.arc(x, shoulderY - headRadius, headRadius, 0, Math.PI * 2);
+  ctx.stroke();
+  if (accent) {
+    ctx.fillStyle = accent;
+    ctx.globalAlpha = 0.35;
+    ctx.fill();
+  }
+
+  // Trail sash
+  if (accent) {
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = accent;
+    ctx.beginPath();
+    ctx.moveTo(x - 8 * scale, shoulderY + 6 * scale);
+    ctx.quadraticCurveTo(x - 2 * scale, shoulderY + 18 * scale + counterStride * 0.15, x + 10 * scale, hipY - 10 * scale);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
@@ -602,7 +771,7 @@ function drawParticles() {
   ctx.save();
   for (const particle of state.particles) {
     const alpha = 1 - particle.life / particle.maxLife;
-    ctx.fillStyle = particle.color ?? `rgba(255,255,255,${alpha * 0.6})`;
+    ctx.fillStyle = particle.color ?? `rgba(255, 210, 170, ${alpha * 0.7})`;
     const screenX = particle.x - state.cameraX;
     const size = particle.size ?? 3;
     ctx.beginPath();
