@@ -992,9 +992,7 @@ function handleKeyDown(event) {
       event.preventDefault();
       queueJump();
       break;
-    case "Shift":
-    case "d":
-    case "D":
+    case "ArrowRight":
       event.preventDefault();
       queueDash();
       break;
