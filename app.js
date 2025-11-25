@@ -13,8 +13,8 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x03040a);
-scene.fog = new THREE.Fog(0x03040a, 55, 180);
+scene.background = new THREE.Color(0x132542);
+scene.fog = new THREE.Fog(0x132542, 80, 220);
 
 const camera = new THREE.PerspectiveCamera(65, canvas.clientWidth / canvas.clientHeight, 0.1, 400);
 camera.position.set(0, 1.62, 32);
