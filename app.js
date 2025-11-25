@@ -37,7 +37,7 @@ const config = {
   lavaWaveLength: 220,
   forestBaseHeight: 110,
   dashSpeedBonus: 420,
-  dashDuration: 0.22,
+  dashDuration: 0.34,
   dashVerticalBoost: 620,
   dashGravityScale: 0.6,
   dashBuffer: 0.2,
