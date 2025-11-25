@@ -16,6 +16,13 @@ const config = {
   coyoteTime: 0.12,
   jumpBuffer: 0.16,
   platformHeight: 56,
+  platformGapMin: 140,
+  platformGapMax: 300,
+  platformGapBaseVariance: 26,
+  platformGapVarianceGrowth: 34,
+  platformWidthMin: 140,
+  platformWidthMax: 240,
+  platformVerticalVariance: 90,
   trailInterval: 0.08,
   checkpointInterval: 250,
   checkpointToastDuration: 2.5,
@@ -55,6 +62,7 @@ const state = {
   maxDistanceThisRun: 0,
   pendingRespawn: null,
   elapsed: 0,
+  lastPlatformGap: null,
 };
 
 function loadBestDistance() {
@@ -80,6 +88,10 @@ function randomRange(min, max) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function lerp(start, end, t) {
+  return start + (end - start) * t;
 }
 
 function formatSeconds(value) {
@@ -140,6 +152,7 @@ function resetGame() {
   state.maxDistanceThisRun = 0;
   state.pendingRespawn = null;
   state.elapsed = 0;
+  state.lastPlatformGap = null;
   seedWorld();
   updateHud();
   setPauseLabel();
@@ -156,9 +169,17 @@ function ensurePlatforms() {
   const lookAhead = state.player.x + 1600;
   while (state.spawnX < lookAhead) {
     const prev = state.platforms[state.platforms.length - 1];
-    const gap = randomRange(110, 220 + Math.min(140, state.distance * 0.25));
-    const width = randomRange(120, 260);
-    const variance = randomRange(-120, 120);
+    const progress = clamp(state.distance / 600, 0, 1);
+    const targetGap = lerp(config.platformGapMin, config.platformGapMax, progress);
+    const previousGap = state.lastPlatformGap ?? targetGap;
+    const smoothedGap = lerp(previousGap, targetGap, 0.4);
+    const varianceRange = config.platformGapBaseVariance + config.platformGapVarianceGrowth * progress;
+    const minGap = clamp(smoothedGap - varianceRange, config.platformGapMin, config.platformGapMax);
+    const maxGap = clamp(smoothedGap + varianceRange, config.platformGapMin, config.platformGapMax);
+    const gap = randomRange(Math.min(minGap, maxGap), Math.max(minGap, maxGap));
+    state.lastPlatformGap = gap;
+    const width = randomRange(config.platformWidthMin, config.platformWidthMax);
+    const variance = randomRange(-config.platformVerticalVariance, config.platformVerticalVariance);
     const minY = canvas.height - 320;
     const maxY = canvas.height - 140;
     const y = clamp(prev.y + variance, minY, maxY);
