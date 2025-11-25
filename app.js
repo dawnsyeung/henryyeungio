@@ -13,7 +13,6 @@ const config = {
   gravity: 2400,
   jumpVelocity: 980,
   baseSpeed: 280,
-  maxSpeedBoost: 260,
   coyoteTime: 0.12,
   jumpBuffer: 0.16,
   platformHeight: 56,
@@ -219,7 +218,7 @@ function updateGame(dt) {
   const player = state.player;
   const prevY = player.y;
 
-  state.speed = config.baseSpeed + Math.min(config.maxSpeedBoost, state.distance * 0.8);
+  state.speed = config.baseSpeed;
   player.x += state.speed * dt;
 
   player.vy += config.gravity * dt;
@@ -511,7 +510,6 @@ function render(time = 0) {
   drawParticles();
   drawGhostRunners(time);
   drawPlayer(time);
-  drawSpeedBar();
   drawCheckpointToast();
 
   if (!state.isRunning) {
@@ -778,27 +776,6 @@ function drawParticles() {
     ctx.arc(screenX, particle.y, size, 0, Math.PI * 2);
     ctx.fill();
   }
-  ctx.restore();
-}
-
-function drawSpeedBar() {
-  const pct = clamp((state.speed - config.baseSpeed) / config.maxSpeedBoost, 0, 1);
-  const barWidth = canvas.width * 0.4;
-  const barHeight = 12;
-  const x = canvas.width - barWidth - 32;
-  const y = canvas.height - 32;
-
-  ctx.save();
-  ctx.fillStyle = "rgba(255,255,255,0.15)";
-  ctx.fillRect(x, y, barWidth, barHeight);
-  const gradient = ctx.createLinearGradient(x, y, x + barWidth, y);
-  gradient.addColorStop(0, "#5ef2ff");
-  gradient.addColorStop(1, "#ff8a5c");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(x, y, barWidth * pct, barHeight);
-  ctx.strokeStyle = "rgba(255,255,255,0.4)";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x, y, barWidth, barHeight);
   ctx.restore();
 }
 
