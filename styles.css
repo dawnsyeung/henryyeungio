@@ -1,7 +1,7 @@
 :root {
   color-scheme: dark;
   font-family: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --bg: radial-gradient(circle at 18% 12%, #4a1b6a 0%, #0b0313 45%, #010005 100%);
+  --bg: radial-gradient(circle at 20% 15%, #6a34d4 0%, #182a52 50%, #0e172b 100%);
   --panel: rgba(6, 9, 26, 0.9);
   --panel-alt: rgba(16, 14, 36, 0.85);
   --panel-border: rgba(115, 191, 255, 0.24);
@@ -220,11 +220,11 @@ canvas {
   height: auto;
   border-radius: 28px;
   border: 1px solid rgba(117, 210, 255, 0.25);
-  background: radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0)),
-    #04030c;
+  background: radial-gradient(circle at 50% 5%, rgba(255, 255, 255, 0.12), rgba(9, 25, 53, 0)),
+    #0b1b33;
   outline: none;
   cursor: crosshair;
-  box-shadow: inset 0 0 40px rgba(5, 12, 32, 0.9), 0 0 45px rgba(26, 152, 255, 0.2);
+  box-shadow: inset 0 0 60px rgba(10, 24, 55, 0.9), 0 0 45px rgba(26, 152, 255, 0.2);
 }
 
 .canvas-callout {
