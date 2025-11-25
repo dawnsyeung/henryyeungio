@@ -19,6 +19,7 @@ Helix Ember is a browser-based 3D breach scenario powered by Three.js. You drop 
 - Enemy humans built from modular meshes, each carrying rifles that fire back with projectile logic.
 - Wave escalations, pressure meter, and HUD panels for armor, time, eliminations, and weapon state.
 - Particle bursts, hit sparks, and crosshair feedback to highlight every successful shot.
+- Couch co-op lane running with two simultaneous players, each with their own jump bindings.
 
 ## Customizing
 
