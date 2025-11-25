@@ -473,48 +473,120 @@ function drawGroundGrid(time) {
 }
 
 function drawPlayer() {
+  if (!ctx) return;
   const projected = projectPoint(state.player.x, state.player.z, 0);
   if (!projected) return;
-  const bodyHeight = clamp(80 * projected.scale, 32, 120);
-  const bodyWidth = clamp(30 * projected.scale, 12, 40);
+  const scale = clamp(projected.scale, 0.35, 1.25);
+  const bodyHeight = clamp(105 * scale, 40, 150);
+  const torsoHeight = bodyHeight * 0.55;
+  const torsoWidth = bodyHeight * 0.2;
+  const headRadius = bodyHeight * 0.12;
+  const limbLength = bodyHeight * 0.45;
+  const lean = clamp(state.input.right * 0.55, -0.9, 0.9);
+  const sprint = clamp(state.input.forward, -1, 1);
+  const stride = Math.sin(state.elapsed * 8.5 + state.player.z * 0.01) * sprint;
 
   ctx.save();
   ctx.translate(projected.x, projected.y);
-  ctx.fillStyle = "#8df1ff";
+  ctx.rotate(lean * 0.22);
+  ctx.lineCap = "round";
+
+  ctx.fillStyle = "rgba(96, 245, 255, 0.18)";
   ctx.beginPath();
-  ctx.moveTo(0, -bodyHeight);
-  ctx.lineTo(bodyWidth * 0.5, -bodyHeight * 0.55);
-  ctx.lineTo(bodyWidth * 0.35, 0);
-  ctx.lineTo(-bodyWidth * 0.35, 0);
-  ctx.lineTo(-bodyWidth * 0.5, -bodyHeight * 0.55);
-  ctx.closePath();
+  ctx.ellipse(0, bodyHeight * 0.2, bodyHeight * 0.5, bodyHeight * 0.22, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.strokeStyle = "rgba(77, 210, 255, 0.9)";
+  ctx.lineWidth = clamp(6.5 * scale, 2, 8);
   ctx.beginPath();
-  ctx.moveTo(0, -bodyHeight);
-  ctx.lineTo(bodyWidth * 0.15, -bodyHeight * 0.45);
-  ctx.lineTo(bodyWidth * 0.07, 0);
-  ctx.lineTo(-bodyWidth * 0.07, 0);
-  ctx.lineTo(-bodyWidth * 0.15, -bodyHeight * 0.45);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.moveTo(0, -bodyHeight * 0.95);
-  ctx.lineTo(bodyWidth * 0.22, -bodyHeight * 0.8);
-  ctx.lineTo(0, -bodyHeight * 0.65);
-  ctx.lineTo(-bodyWidth * 0.22, -bodyHeight * 0.8);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.strokeStyle = "rgba(255,255,255,0.65)";
-  ctx.lineWidth = clamp(3 * projected.scale, 1, 6);
-  ctx.beginPath();
-  ctx.moveTo(0, -bodyHeight * 0.7);
-  ctx.lineTo(0, -bodyHeight * 0.05);
+  ctx.moveTo(-torsoWidth * 0.7, 0);
+  ctx.lineTo(-torsoWidth * 0.2 - lean * 4, limbLength * 0.95 + stride * 8);
   ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(torsoWidth * 0.7, 0);
+  ctx.lineTo(torsoWidth * 0.2 - lean * 4, limbLength * 0.95 - stride * 8);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(255, 161, 255, 0.35)";
+  ctx.beginPath();
+  ctx.ellipse(-torsoWidth * 0.2 - lean * 4, limbLength * 0.95 + stride * 8, headRadius * 0.4, headRadius * 0.2, 0, 0, Math.PI * 2);
+  ctx.ellipse(torsoWidth * 0.2 - lean * 4, limbLength * 0.95 - stride * 8, headRadius * 0.4, headRadius * 0.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  const torsoGradient = ctx.createLinearGradient(0, -torsoHeight, 0, 0);
+  torsoGradient.addColorStop(0, "#e6fbff");
+  torsoGradient.addColorStop(0.65, "#7ad7ff");
+  torsoGradient.addColorStop(1, "#3482ff");
+  ctx.fillStyle = torsoGradient;
+  ctx.beginPath();
+  ctx.moveTo(-torsoWidth, 0);
+  ctx.lineTo(-torsoWidth * 1.1, -torsoHeight * 0.35);
+  ctx.quadraticCurveTo(0, -torsoHeight * 1.1, torsoWidth * 1.1, -torsoHeight * 0.35);
+  ctx.lineTo(torsoWidth, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
+  ctx.lineWidth = clamp(3 * scale, 1.2, 4);
+  ctx.beginPath();
+  ctx.moveTo(0, -torsoHeight * 1.02);
+  ctx.lineTo(0, -torsoHeight * 0.05);
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(214, 251, 255, 0.9)";
+  ctx.lineWidth = clamp(5 * scale, 1.5, 6);
+  ctx.beginPath();
+  ctx.moveTo(-torsoWidth * 1.05, -torsoHeight * 0.5);
+  ctx.lineTo(-torsoWidth * 0.2 - stride * 5, -torsoHeight * 0.1 + sprint * 8);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(torsoWidth * 1.05, -torsoHeight * 0.5);
+  ctx.lineTo(torsoWidth * 0.2 - stride * 5, -torsoHeight * 0.1 - sprint * 8);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(93, 247, 255, 0.85)";
+  ctx.beginPath();
+  ctx.arc(-torsoWidth * 0.2 - stride * 5, -torsoHeight * 0.1 + sprint * 8, headRadius * 0.45, 0, Math.PI * 2);
+  ctx.arc(torsoWidth * 0.2 - stride * 5, -torsoHeight * 0.1 - sprint * 8, headRadius * 0.45, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(14, 24, 48, 0.7)";
+  const plateWidth = torsoWidth * 1.2;
+  const plateHeight = torsoHeight * 0.35;
+  const plateX = -plateWidth / 2;
+  const plateY = -torsoHeight * 0.55;
+  const plateRadius = plateWidth * 0.25;
+  ctx.beginPath();
+  ctx.moveTo(plateX + plateRadius, plateY);
+  ctx.lineTo(plateX + plateWidth - plateRadius, plateY);
+  ctx.quadraticCurveTo(plateX + plateWidth, plateY, plateX + plateWidth, plateY + plateRadius);
+  ctx.lineTo(plateX + plateWidth, plateY + plateHeight - plateRadius);
+  ctx.quadraticCurveTo(plateX + plateWidth, plateY + plateHeight, plateX + plateWidth - plateRadius, plateY + plateHeight);
+  ctx.lineTo(plateX + plateRadius, plateY + plateHeight);
+  ctx.quadraticCurveTo(plateX, plateY + plateHeight, plateX, plateY + plateHeight - plateRadius);
+  ctx.lineTo(plateX, plateY + plateRadius);
+  ctx.quadraticCurveTo(plateX, plateY, plateX + plateRadius, plateY);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(93, 247, 255, 0.65)";
+  ctx.fillRect(-plateWidth * 0.35, plateY + plateHeight * 0.22, plateWidth * 0.7, plateHeight * 0.22);
+
+  const headY = -torsoHeight - headRadius * 0.4;
+  const helmetGradient = ctx.createRadialGradient(0, headY - headRadius * 0.2, headRadius * 0.3, 0, headY - headRadius * 0.2, headRadius);
+  helmetGradient.addColorStop(0, "#ffffff");
+  helmetGradient.addColorStop(0.5, "#b3f3ff");
+  helmetGradient.addColorStop(1, "#3e6fff");
+  ctx.fillStyle = helmetGradient;
+  ctx.beginPath();
+  ctx.arc(0, headY, headRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(6, 13, 34, 0.8)";
+  ctx.fillRect(-headRadius * 0.6, headY - headRadius * 0.4, headRadius * 1.2, headRadius * 0.65);
+  ctx.fillStyle = "rgba(122, 244, 255, 0.75)";
+  ctx.fillRect(-headRadius * 0.5, headY - headRadius * 0.32, headRadius, headRadius * 0.35);
+
   ctx.restore();
 }
 
@@ -548,6 +620,53 @@ function drawEnemies() {
     ctx.beginPath();
     ctx.arc(0, 0, radius, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawTargetIndicators() {
+  if (!ctx) return;
+  const liveEnemies = state.enemies.filter((enemy) => enemy.alive);
+  if (!liveEnemies.length) return;
+  const highlighted = [...liveEnemies].sort((a, b) => a.z - b.z).slice(0, Math.min(4, liveEnemies.length));
+  const time = state.elapsed;
+
+  for (let i = 0; i < highlighted.length; i += 1) {
+    const enemy = highlighted[i];
+    const projected = projectPoint(enemy.x, enemy.z, 0);
+    if (!projected) continue;
+    const radius = clamp(enemy.radius * projected.scale * 1.35, 10, 60);
+    const pulse = 0.45 + 0.4 * Math.sin(time * 5 + enemy.z * 0.01);
+
+    ctx.save();
+    ctx.translate(projected.x, projected.y);
+    ctx.strokeStyle = `rgba(255, 224, 173, ${0.5 + pulse * 0.4})`;
+    ctx.lineWidth = 1.4 + pulse * 0.6;
+    ctx.setLineDash([radius * 0.5, radius * 0.2]);
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(-radius - 6, 0);
+    ctx.lineTo(-radius - 18, 0);
+    ctx.moveTo(radius + 6, 0);
+    ctx.lineTo(radius + 18, 0);
+    ctx.moveTo(0, -radius - 6);
+    ctx.lineTo(0, -radius - 18);
+    ctx.moveTo(0, radius + 6);
+    ctx.lineTo(0, radius + 18);
+    ctx.stroke();
+
+    ctx.font = "600 12px Montserrat, sans-serif";
+    ctx.fillStyle = "rgba(255, 241, 205, 0.9)";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(`Target ${i + 1}`, 0, radius + 14);
+    ctx.textBaseline = "bottom";
+    ctx.fillText(`${Math.max(0, Math.round(enemy.z - state.player.z))}m`, 0, -radius - 12);
     ctx.restore();
   }
 }
@@ -591,6 +710,7 @@ function render(time = 0) {
   drawGroundGrid(time);
   drawBullets();
   drawEnemies();
+  drawTargetIndicators();
   drawParticles();
   drawPlayer();
   drawOverlay();
