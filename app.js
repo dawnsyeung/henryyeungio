@@ -9,6 +9,8 @@ const timerEl = document.getElementById("timer");
 const cornerTimerEl = document.getElementById("corner-timer");
 const resetBtn = document.getElementById("reset-btn");
 const pauseBtn = document.getElementById("pause-btn");
+const dashBtn = document.getElementById("dash-btn");
+const dashBtnStateLabel = document.getElementById("dash-btn-state");
 const bestStorageKey = "blockstep-best";
 
 const config = {
@@ -491,6 +493,11 @@ function queueDash() {
   state.dashBufferTimer = config.dashBuffer;
 }
 
+function handleDashButton(event) {
+  event.preventDefault();
+  queueDash();
+}
+
 function canDash() {
   if (!state.player) return false;
   if (!state.dashCharge) return false;
@@ -638,6 +645,24 @@ function updateHud() {
       dashEl.textContent = state.onGround ? "Refilling" : "Spent";
     }
   }
+  syncDashButtonAppearance();
+}
+
+function syncDashButtonAppearance() {
+  if (!dashBtn) return;
+  const status = state.dashActiveTimer > 0 ? "boost" : state.dashCharge ? "ready" : state.onGround ? "refill" : "spent";
+  dashBtn.dataset.state = status;
+  if (dashBtnStateLabel) {
+    const labelMap = {
+      boost: "Boost!",
+      ready: "Ready",
+      refill: "Refilling",
+      spent: "Spent",
+    };
+    dashBtnStateLabel.textContent = labelMap[status] ?? "Ready";
+  }
+  dashBtn.dataset.queued = state.dashBufferTimer > 0 ? "true" : "false";
+  dashBtn.disabled = !state.isRunning;
 }
 
 function render(time = 0) {
@@ -1001,6 +1026,10 @@ function handlePointer(event) {
 function attachEvents() {
   if (resetBtn) resetBtn.addEventListener("click", resetGame);
   if (pauseBtn) pauseBtn.addEventListener("click", togglePause);
+  if (dashBtn) {
+    dashBtn.addEventListener("pointerdown", handleDashButton);
+    dashBtn.addEventListener("click", handleDashButton);
+  }
   canvas.addEventListener("pointerdown", handlePointer);
   window.addEventListener("keydown", handleKeyDown);
   window.addEventListener("blur", () => setPaused(true));

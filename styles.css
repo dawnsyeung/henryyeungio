@@ -215,6 +215,96 @@ button {
   border-color: rgba(255, 255, 255, 0.25);
 }
 
+.dash-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem 1.35rem 0.45rem 0.45rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  min-width: 190px;
+}
+
+.dash-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.dash-arrow {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 1.35rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dash-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+}
+
+.dash-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+}
+
+.dash-state {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cream);
+}
+
+.dash-btn[data-state="ready"] .dash-arrow {
+  background: linear-gradient(125deg, #ffe49a, #ff7a5f);
+  color: #1f0f16;
+  box-shadow: 0 10px 25px rgba(255, 122, 95, 0.35);
+}
+
+.dash-btn[data-state="boost"] .dash-arrow {
+  background: linear-gradient(120deg, #ff4f4f, #ff9a62);
+  color: #1b0200;
+  animation: dash-pulse 0.8s ease-in-out infinite;
+  box-shadow: 0 0 25px rgba(255, 79, 79, 0.55);
+}
+
+.dash-btn[data-state="refill"] .dash-arrow {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.dash-btn[data-state="spent"] .dash-arrow {
+  background: rgba(14, 7, 12, 0.7);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.dash-btn[data-queued="true"] .dash-arrow {
+  transform: translateX(2px);
+  box-shadow: 0 0 18px rgba(255, 214, 158, 0.45);
+}
+
+@keyframes dash-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .reset:hover {
   background: rgba(30, 80, 60, 0.9);
   transform: translateY(-1px);
