@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Blockstep Parkour</title>
+    <title>Molten Stick Sprint</title>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap"
@@ -15,15 +15,22 @@
     <div class="app-shell">
       <header class="panel hero">
         <div class="hero-copy">
-          <p class="eyebrow">Endless Parkour Trial</p>
-          <h1>Blockstep Parkour</h1>
-          <p>Dash across floating voxels, buffer your jumps, and keep the run alive as the course speeds up.</p>
+          <p class="eyebrow">Lava Canyon Parkour</p>
+          <h1>Molten Stick Sprint</h1>
+          <p>
+            Guide a squad of neon stick figures sprinting over a lava river while distant tree lines race by. Queue jumps,
+            stay above the heat, and let the stopwatch prove every daring second.
+          </p>
           <div class="hero-actions">
             <button id="reset-btn" type="button" class="primary">Reset Run</button>
             <button id="pause-btn" type="button">Pause</button>
           </div>
         </div>
         <div class="stats">
+          <div class="stat">
+            <p class="label">Stopwatch</p>
+            <p id="timer" class="value">0:00.0</p>
+          </div>
           <div class="stat">
             <p class="label">Distance</p>
             <p id="distance" class="value">0m</p>
@@ -33,7 +40,7 @@
             <p id="best" class="value">0m</p>
           </div>
           <div class="stat">
-            <p class="label">Momentum</p>
+            <p class="label">Heat Flow</p>
             <p id="pace" class="value gun-name">0 b/s</p>
           </div>
           <div class="stat">
@@ -48,7 +55,7 @@
           <div class="canvas-headline">
             <div>
               <h2>Active Run</h2>
-              <p>Queue jumps before you leave an edge. Landing keeps your speed climbing.</p>
+              <p>Tap out perfect hops above the lava pit. Watch the stopwatch and aim for longer forest-lined sprints.</p>
             </div>
           </div>
           <canvas
@@ -66,12 +73,12 @@
             <p>Buffered jumps trigger on the first possible frame. Staying grounded refreshes the buffer.</p>
           </div>
           <ul class="tips">
-            <li>Press Space, W, Up/Down Arrow, or tap to jump. Hold to queue a buffer.</li>
+            <li>Press Space, W, Up/Down Arrow, or tap to jump. Hold to queue a buffer for the next edge.</li>
             <li>R resets instantly. P or the Pause button toggles slow-motion inspect mode.</li>
-            <li>Coyote time lets you leave a block for ~0.12s and still jump.</li>
-            <li>The momentum stat shows blocks per second — higher values mean longer gaps.</li>
+            <li>Coyote time lets you step off a block for ~0.12s and still launch.</li>
+            <li>The Heat Flow stat shows blocks per second — more heat means bigger gaps.</li>
+            <li>The stopwatch never lies: push for longer survival streaks without touching the lava.</li>
             <li>Landing every ~250m drops a checkpoint flag. Falls rewind you to the latest unspent flag before ending the run.</li>
-            <li>Land in the middle of platforms to avoid clipping short gaps as speed rises.</li>
           </ul>
           <div class="hotkeys">
             <p><span class="key">Space/W/↑/↓</span> jump & buffer</p>

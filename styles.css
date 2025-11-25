@@ -1,17 +1,19 @@
 :root {
   color-scheme: dark;
   font-family: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --bg: radial-gradient(circle at 20% 20%, #1a3952, #040b16 55%);
-  --panel: rgba(14, 30, 41, 0.85);
+  --bg: radial-gradient(circle at 28% 18%, #3c144d 0%, #120017 35%, #040103 100%);
+  --panel: rgba(12, 8, 20, 0.9);
   --panel-light: rgba(255, 255, 255, 0.05);
-  --border: rgba(255, 255, 255, 0.16);
-  --text: #f6fffb;
-  --muted: rgba(246, 255, 251, 0.75);
-  --cream: #f6fffb;
-  --highlight: #7bff9b;
-  --accent: #ffb347;
-  --accent-strong: #ff8a5c;
-  --shadow: 0 30px 60px rgba(0, 0, 0, 0.55);
+  --border: rgba(255, 118, 82, 0.35);
+  --text: #fff5ec;
+  --muted: rgba(255, 244, 230, 0.65);
+  --cream: #ffe7d2;
+  --highlight: #ffdf7a;
+  --accent: #ffa65f;
+  --accent-strong: #ff4f4f;
+  --lava: #f7471d;
+  --forest: #183424;
+  --shadow: 0 35px 70px rgba(0, 0, 0, 0.65);
 }
 
 *,
@@ -119,8 +121,8 @@ h1 {
 .gun-name {
   font-size: 1.1rem;
   color: var(--highlight);
-  text-shadow: 0 0 12px rgba(123, 255, 155, 0.45);
-  color: var(--accent);
+  text-shadow: 0 0 18px rgba(255, 97, 52, 0.55);
+  color: var(--accent-strong);
 }
 
 .play-area {
@@ -158,7 +160,8 @@ canvas {
   height: auto;
   border-radius: 26px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: #041019;
+  background: radial-gradient(circle at 60% 20%, rgba(255, 165, 92, 0.17), rgba(0, 0, 0, 0)),
+    #160409;
   cursor: none;
   outline: none;
 }
@@ -189,7 +192,7 @@ button {
 }
 
 button.primary {
-  background: linear-gradient(120deg, #ff9a62, #ff5c91);
+  background: linear-gradient(120deg, #ff9a62, #ff375b);
   border: none;
   color: #1f0f16;
 }
