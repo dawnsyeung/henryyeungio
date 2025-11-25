@@ -10,6 +10,9 @@ const ui = {
   best: document.getElementById("best-value"),
   speed: document.getElementById("speed-value"),
   status: document.getElementById("status-text"),
+  loadTrack: document.getElementById("load-track"),
+  loadFill: document.getElementById("load-fill"),
+  loadText: document.getElementById("load-text"),
 };
 
 const controls = {
@@ -26,6 +29,8 @@ const config = {
   jumpForce: 940,
   baseSpeed: 340,
   speedRamp: 170,
+  difficultyScoreSpan: 500,
+  maxDifficulty: 1.5,
   spawnBase: 1.2,
   spawnVariance: 0.55,
   obstacleWidth: { min: 32, max: 76 },
@@ -45,6 +50,7 @@ const state = {
   currentSpeed: config.baseSpeed,
   lastLoser: null,
   lastTime: 0,
+  loadRatio: 0,
 };
 
 const players = [
@@ -153,8 +159,9 @@ function update(dt) {
     player.jumpFlash = Math.max(0, player.jumpFlash - dt);
   }
 
-  const difficulty = Math.min(state.score / 500, 1.5);
+  const difficulty = Math.min(state.score / config.difficultyScoreSpan, config.maxDifficulty);
   state.currentSpeed = config.baseSpeed + config.speedRamp * difficulty;
+  state.loadRatio = config.maxDifficulty > 0 ? difficulty / config.maxDifficulty : 0;
 
   state.spawnTimer -= dt;
   if (state.spawnTimer <= 0) {
@@ -178,6 +185,7 @@ function update(dt) {
   state.score += dt * state.currentSpeed * config.scoreRate;
   updateScoreUI();
   updateSpeedReadout();
+  updateLoadBar();
 }
 
 function draw() {
@@ -328,10 +336,12 @@ function startRun() {
   state.obstacles = [];
   state.spawnTimer = 0.8;
   state.currentSpeed = config.baseSpeed;
-  state.lastLoser = null;
-  placePlayers();
+  state.jumpFlash = 0;
+  state.loadRatio = 0;
+  placePlayer();
   updateScoreUI();
   updateSpeedReadout();
+  updateLoadBar(0);
   setStatusText(getStatusMessage());
   updateControls();
 }
@@ -343,11 +353,13 @@ function resetToIdle(message) {
   state.spawnTimer = config.spawnBase;
   state.score = 0;
   state.currentSpeed = config.baseSpeed;
-  state.lastLoser = null;
-  placePlayers();
+  state.jumpFlash = 0;
+  state.loadRatio = 0;
+  placePlayer();
   updateScoreUI();
   updateSpeedReadout();
-  setStatusText(message ?? getStatusMessage());
+  updateLoadBar(0);
+  setStatusText(message);
   updateControls();
 }
 
@@ -390,6 +402,22 @@ function updateSpeedReadout() {
   const multiplier = (state.currentSpeed / config.baseSpeed).toFixed(1);
   if (ui.speed) {
     ui.speed.textContent = `${multiplier}x`;
+  }
+}
+
+function updateLoadBar(ratio = state.loadRatio) {
+  const safeRatio = Number.isFinite(ratio) ? ratio : 0;
+  const clamped = Math.max(0, Math.min(safeRatio, 1));
+  const percent = Math.round(clamped * 100);
+
+  if (ui.loadFill) {
+    ui.loadFill.style.width = `${percent}%`;
+  }
+  if (ui.loadTrack) {
+    ui.loadTrack.setAttribute("aria-valuenow", percent.toString());
+  }
+  if (ui.loadText) {
+    ui.loadText.textContent = `${percent}%`;
   }
 }
 
