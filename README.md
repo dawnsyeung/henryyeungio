@@ -11,12 +11,14 @@ Molten Stick Sprint is a canvas-rendered parkour challenge where a squad of neon
 2. The runner automatically surges forward. Press **Space**, **W**, **Up Arrow**, **Down Arrow**, or tap the canvas to jump.
 3. Hold the jump input to buffer the next leap — it fires on the first possible frame after touching ground.
 4. Tap **R** or hit **Reset Run** to restart. **P** (or the Pause button) freezes the action without clearing the stopwatch.
+5. Double-tap (touch) or press **Shift** / **D** mid-air to unleash a dash burst that stretches over wider gaps; landing reloads the dash charge.
 
 ## Features
 
 - Lava river with animated waves, ember sprites, and parallax tree lines to set the canyon vibe.
 - Stick-figure rendering system (player + ghost runners) that animates arms, legs, and glowing trails.
 - Stopwatch HUD alongside distance, best run, heat flow (speed), and checkpoint banking.
+- Mid-air dash system with particle bursts, gravity dampening, and a HUD charge indicator for clutch saves.
 - Jump buffering, coyote time, dust FX, and trail particles for responsive inputs and feedback.
 - Persistent best distance, checkpoints every ~250 meters, and optional respawn delays.
 
