@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Skybound Springs — Jump & Dash</title>
+    <title>Starwatch Expedition — Bird's Eye Adventure</title>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap"
@@ -15,11 +15,12 @@
     <div class="game-shell">
       <header class="panel hero">
         <div class="hero-copy">
-          <p class="eyebrow">Arcade Prototype • Jumping Challenge</p>
-          <h1>Skybound Springs</h1>
+          <p class="eyebrow">Prototype Build • Top-Down Exploration</p>
+          <h1>Starwatch Expedition</h1>
           <p>
-            Ride a neon runway, dash past vapor blocks, and time each leap to keep the flow alive. Simple controls, fast resets, endless
-            altitude. Tag in a co-pilot—two runners can now vault the lane at once with their own key sets.
+            Pilot a ranger squad from a floating command console and guide a single scout through the ruins below. Glide across mossy
+            courtyards, snag radiant artifacts, and weave around clockwork sentries that patrol on looping routes. Every decision happens
+            from a bird's-eye view, so read the whole map before you commit to a sprint.
           </p>
           <div class="hero-actions">
             <button id="play-btn" type="button" class="primary">Play</button>
@@ -37,15 +38,15 @@
             <p id="best-value" class="value">0</p>
           </div>
           <div class="stat">
-            <p class="label">Speed Tier</p>
-            <p id="speed-value" class="value gun-name">1.0x</p>
+            <p class="label">Threat Level</p>
+            <p id="speed-value" class="value gun-name">Calm</p>
           </div>
         </div>
 
         <div class="loadup">
           <div class="loadup-head">
-            <p class="label">Load-Up Bar</p>
-            <p id="load-text" class="load-text">0%</p>
+            <p class="label">Pulse Cooldown</p>
+            <p id="load-text" class="load-text">Ready</p>
           </div>
           <div
             id="load-track"
@@ -54,83 +55,76 @@
             aria-label="Speed load progress"
             aria-valuemin="0"
             aria-valuemax="100"
-            aria-valuenow="0"
+            aria-valuenow="100"
           >
-            <div id="load-fill" class="load-fill"></div>
+            <div id="load-fill" class="load-fill" style="width: 100%"></div>
           </div>
         </div>
-      <div id="mode-toggle" class="mode-toggle" role="group" aria-label="Player mode">
-        <div class="mode-toggle-head">
-          <p class="label">Player Mode</p>
-          <p class="mode-blurb">Swap between a solo lane or split-screen dual run.</p>
-        </div>
-        <div class="mode-toggle-buttons">
-          <button type="button" class="mode-btn active" data-mode="solo">Solo Run</button>
-          <button type="button" class="mode-btn" data-mode="duo">Dual Split</button>
-        </div>
-      </div>
       </header>
 
       <main class="panel playfield">
         <div class="canvas-headline">
           <div>
-            <h2>Jumping Lane</h2>
-          <p>Kick off a classic solo dash or enable two-player mode for mirrored split-screen chaos.</p>
+            <h2>Recon Grid</h2>
+          <p>Collect skyshards, avoid sentries, and reach the evac flare without losing visual contact.</p>
           </div>
           <div class="hotkeys">
-          <p>P1 jump <span class="key">Space</span> / <span class="key">Click</span></p>
-          <p>P2 jump <span class="key">Arrow&nbsp;Up</span> / <span class="key">Numpad&nbsp;8</span></p>
-            <p><span class="key">P</span> pause / resume</p>
+          <p>Move with <span class="key">WASD</span> or <span class="key">Arrows</span></p>
+          <p>Hold <span class="key">Shift</span> to sprint</p>
+          <p>Trigger <span class="key">Space</span> to pulse and stun sentries</p>
+          <p><span class="key">P</span> pause / resume</p>
           <p><span class="key">R</span> restart</p>
             <p>
-              Runner One jumps with Space/W/Click and dashes with L&nbsp;Shift/Q/D. Runner Two jumps with Arrow&nbsp;Up/L/Numpad&nbsp;8 and dashes with
-              Arrow&nbsp;Right/R&nbsp;Shift/O. Time jumps to clear height and trigger dashes to phase past close vapor blocks.
+              Sentries switch to a chase state if you cross their field of view. Sprint to break line of sight, or pop an echo pulse to freeze them temporarily.
             </p>
           </div>
           <div class="hotkeys">
             <div class="hotkey-card">
-              <p class="label">Runner One Jump</p>
+              <p class="label">Move</p>
               <p>
-                <span class="key">Space</span>
                 <span class="key">W</span>
-                <span class="key">Click</span>
-              </p>
-            </div>
-            <div class="hotkey-card">
-              <p class="label">Runner Two Jump</p>
-              <p>
-                <span class="key">Arrow&nbsp;Up</span>
-                <span class="key">L</span>
-                <span class="key">Numpad&nbsp;8</span>
-              </p>
-            </div>
-            <div class="hotkey-card">
-              <p class="label">Runner One Dash</p>
-              <p>
-                <span class="key">L&nbsp;Shift</span>
-                <span class="key">Q</span>
+                <span class="key">A</span>
+                <span class="key">S</span>
                 <span class="key">D</span>
               </p>
             </div>
             <div class="hotkey-card">
-              <p class="label">Runner Two Dash</p>
+              <p class="label">Alternate Move</p>
               <p>
-                <span class="key">R&nbsp;Shift</span>
+                <span class="key">Arrow&nbsp;Up</span>
+                <span class="key">Arrow&nbsp;Left</span>
+                <span class="key">Arrow&nbsp;Down</span>
                 <span class="key">Arrow&nbsp;Right</span>
-                <span class="key">O</span>
+              </p>
+            </div>
+            <div class="hotkey-card">
+              <p class="label">Sprint</p>
+              <p>
+                <span class="key">L&nbsp;Shift</span>
+                <span class="key">R&nbsp;Shift</span>
+              </p>
+            </div>
+            <div class="hotkey-card">
+              <p class="label">Echo Pulse</p>
+              <p>
+                <span class="key">Space</span>
               </p>
             </div>
             <div class="hotkey-card">
               <p class="label">Pause / Resume</p>
               <p><span class="key">P</span></p>
             </div>
+            <div class="hotkey-card">
+              <p class="label">Reset Mission</p>
+              <p><span class="key">R</span></p>
+            </div>
           </div>
         </div>
         <canvas
-          id="runner-canvas"
+          id="expedition-canvas"
           width="960"
-          height="360"
-          aria-label="Simple neon jumping game"
+          height="540"
+          aria-label="Top-down ruins exploration game"
         ></canvas>
         <p id="status-text" class="status-text">Tap Play to begin.</p>
       </main>

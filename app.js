@@ -1,14 +1,14 @@
-const canvas = document.getElementById("runner-canvas");
+const canvas = document.getElementById("expedition-canvas");
 const ctx = canvas?.getContext("2d");
 
 if (!canvas || !ctx) {
-  throw new Error("Missing canvas element #runner-canvas.");
+  throw new Error("Missing canvas element #expedition-canvas.");
 }
 
 const ui = {
   score: document.getElementById("score-value"),
   best: document.getElementById("best-value"),
-  speed: document.getElementById("speed-value"),
+  threat: document.getElementById("speed-value"),
   status: document.getElementById("status-text"),
   loadTrack: document.getElementById("load-track"),
   loadFill: document.getElementById("load-fill"),
@@ -21,84 +21,103 @@ const controls = {
   reset: document.getElementById("reset-btn"),
 };
 
-const modeButtons = Array.from(document.querySelectorAll("#mode-toggle [data-mode]"));
-
-const BEST_KEY = "skyboundSpringsBest";
+const BEST_KEY = "starwatchExpeditionBest";
 
 const config = {
-  groundOffset: 68,
-  gravity: 2500,
-  jumpForce: 940,
-  baseSpeed: 340,
-  speedRamp: 170,
-  difficultyScoreSpan: 500,
-  maxDifficulty: 1.5,
-  spawnBase: 1.2,
-  spawnVariance: 0.55,
-  obstacleWidth: { min: 32, max: 76 },
-  obstacleHeight: { min: 38, max: 118 },
-  scoreRate: 0.02,
-  jumpFlashLife: 0.18,
-  dashDistance: 48,
-  dashDuration: 0.2,
-  dashCooldown: 1.05,
-  dashReturnSpeed: 140,
-  dashInvulnerableWindow: 0.16,
-  colors: ["#5ef5ff", "#7f74ff", "#ff84d8", "#4de0c2"],
+  playerSpeed: 230,
+  sprintMultiplier: 1.55,
+  staminaDrainRate: 1.35,
+  staminaRegenRate: 0.65,
+  playerRadius: 20,
+  artifactGoal: 9,
+  pulseCooldown: 6,
+  pulseDuration: 1.4,
+  worldPadding: 36,
+  sentinelSpeed: 60,
+  sentinelChaseSpeed: 120,
+  sentinelVision: 150,
+  sentinelHoldTime: 1.5,
+  sentinelRadius: 22,
+  pulseSlowMultiplier: 0.35,
+  maxHearts: 3,
 };
+
+const spawnPoint = { x: canvas.width / 2, y: canvas.height - 110 };
+
+const ruins = [
+  { x: 80, y: 60, width: 260, height: 80 },
+  { x: 110, y: 210, width: 180, height: 90 },
+  { x: 360, y: 70, width: 160, height: 120 },
+  { x: 530, y: 180, width: 320, height: 80 },
+  { x: 620, y: 300, width: 240, height: 70 },
+  { x: 120, y: 360, width: 260, height: 120 },
+  { x: 440, y: 410, width: 180, height: 90 },
+  { x: 720, y: 420, width: 140, height: 80 },
+];
+
+const sentinelPresets = [
+  {
+    path: [
+      { x: 180, y: 150 },
+      { x: 420, y: 150 },
+      { x: 420, y: 260 },
+      { x: 180, y: 260 },
+    ],
+    vision: 160,
+  },
+  {
+    path: [
+      { x: 640, y: 120 },
+      { x: 860, y: 120 },
+      { x: 860, y: 220 },
+      { x: 640, y: 220 },
+    ],
+    vision: 150,
+  },
+  {
+    path: [
+      { x: 520, y: 330 },
+      { x: 780, y: 330 },
+      { x: 780, y: 480 },
+      { x: 520, y: 480 },
+    ],
+    vision: 175,
+  },
+];
+
+const moveBindings = new Map([
+  ["KeyW", "up"],
+  ["ArrowUp", "up"],
+  ["KeyS", "down"],
+  ["ArrowDown", "down"],
+  ["KeyA", "left"],
+  ["ArrowLeft", "left"],
+  ["KeyD", "right"],
+  ["ArrowRight", "right"],
+]);
+
+const player = createPlayer();
+const input = { up: false, down: false, left: false, right: false, sprint: false };
+let sentries = [];
+let artifacts = [];
 
 const state = {
   phase: "idle",
   paused: true,
   score: 0,
   best: loadBestScore(),
-  currentSpeed: config.baseSpeed,
-  lastLoser: null,
-  lastTime: 0,
-  loadRatio: 0,
-  mode: "solo",
+  alertLevel: 0,
+  lastTime: performance.now(),
+  pulse: { cooldown: 0, remaining: 0, wave: 0 },
+  lastOutcome: "",
 };
-
-const playerPresets = [
-  {
-    label: "Runner One",
-    startX: 160,
-    bodyColor: "#fefefe",
-    accentColor: "#5ef5ff",
-  },
-  {
-    label: "Runner Two",
-    startX: 160,
-    bodyColor: "#ffd8f7",
-    accentColor: "#ff84d8",
-  },
-];
-
-const players = playerPresets.map((preset) => createPlayer(preset));
-
-const jumpKeyBindings = new Map([
-  ["Space", 0],
-  ["KeyW", 0],
-  ["ArrowUp", 1],
-  ["KeyL", 1],
-  ["Numpad8", 1],
-]);
-
-const dashKeyBindings = new Map([
-  ["ShiftLeft", 0],
-  ["KeyQ", 0],
-  ["KeyD", 0],
-  ["ShiftRight", 1],
-  ["ArrowRight", 1],
-  ["KeyO", 1],
-]);
 
 init();
 
 function init() {
+  resetWorld();
   resetToIdle();
   attachEvents();
-  state.lastTime = performance.now();
   requestAnimationFrame(gameLoop);
 }
 
@@ -106,6 +125,8 @@ function attachEvents() {
   controls.play?.addEventListener("click", () => {
     if (state.phase === "playing" && state.paused) {
       resumeRun();
+    } else if (state.phase === "playing") {
+      startRun();
     } else {
       startRun();
     }
@@ -120,25 +141,31 @@ function attachEvents() {
     resetToIdle();
   });
 
-  canvas.addEventListener("pointerdown", (event) => {
-    event.preventDefault();
-    handleJumpRequest(0);
+  canvas.addEventListener("pointerdown", () => {
+    if (state.phase === "playing" && !state.paused) {
+      triggerPulse();
+    } else if (state.phase === "playing" && state.paused) {
+      resumeRun();
+    } else {
+      startRun();
+    }
   });
 
   window.addEventListener("keydown", (event) => {
     if (event.repeat) return;
-    const jumpPlayerIndex = jumpKeyBindings.get(event.code);
-    if (jumpPlayerIndex !== undefined) {
+    const direction = moveBindings.get(event.code);
+    if (direction) {
       event.preventDefault();
-      handleJumpRequest(jumpPlayerIndex);
-      return;
+      input[direction] = true;
     }
 
-    const dashPlayerIndex = dashKeyBindings.get(event.code);
-    if (dashPlayerIndex !== undefined) {
+    if (event.code === "ShiftLeft" || event.code === "ShiftRight") {
+      input.sprint = true;
+    }
+
+    if (event.code === "Space") {
       event.preventDefault();
-      handleDashRequest(dashPlayerIndex);
-      return;
+      triggerPulse();
     }
 
     if (event.code === "KeyP") {
@@ -154,23 +181,26 @@ function attachEvents() {
     }
   });
 
+  window.addEventListener("keyup", (event) => {
+    const direction = moveBindings.get(event.code);
+    if (direction) {
+      input[direction] = false;
+    }
+    if (event.code === "ShiftLeft" || event.code === "ShiftRight") {
+      input.sprint = false;
+    }
+  });
+
   window.addEventListener("blur", () => {
     if (state.phase === "playing" && !state.paused) {
       pauseRun();
       setStatusText("Paused — focus lost.");
     }
   });
-
-  for (const button of modeButtons) {
-    button.addEventListener("click", () => {
-      const nextMode = button.dataset.mode === "duo" ? "duo" : "solo";
-      setPlayerMode(nextMode);
-    });
-  }
 }
 
 function gameLoop(timestamp = 0) {
-  const delta = Math.min((timestamp - state.lastTime) / 1000, 0.035) || 0;
+  const delta = Math.min((timestamp - state.lastTime) / 1000, 0.04) || 0;
   state.lastTime = timestamp;
 
   if (state.phase === "playing" && !state.paused) {
@@ -182,341 +212,453 @@ function gameLoop(timestamp = 0) {
 }
 
 function update(dt) {
-  const activePlayers = getActivePlayers();
-  if (!activePlayers.length) return;
-  const laneHeight = getLaneHeight(activePlayers.length);
-
-  let highestScore = 0;
-  let aggregateLoadRatio = 0;
-
-  for (const player of activePlayers) {
-    applyMotion(player, dt, laneHeight);
-    tickPlayerTimers(player, dt);
-    updateDashState(player, dt);
-    const collided = updateObstaclesAndCollisions(player, dt, laneHeight);
-    if (collided) {
-      return;
-    }
-
-    player.score += dt * player.currentSpeed * config.scoreRate;
-    highestScore = Math.max(highestScore, player.score);
-    aggregateLoadRatio = Math.max(aggregateLoadRatio, player.loadRatio);
-  }
-
-  state.score = highestScore;
-  state.currentSpeed = activePlayers[0]?.currentSpeed ?? config.baseSpeed;
-  state.loadRatio = aggregateLoadRatio;
-
+  updatePulse(dt);
+  updatePlayer(dt);
+  updateArtifacts(dt);
+  updateSentries(dt);
   updateScoreUI();
-  updateSpeedReadout();
+  updateThreatReadout();
   updateLoadBar();
+  setStatusText(getStatusMessage());
 }
 
-function applyMotion(player, dt, laneHeight) {
-  player.vy += config.gravity * dt;
-  player.y += player.vy * dt;
+function updatePulse(dt) {
+  if (state.pulse.cooldown > 0) {
+    state.pulse.cooldown = Math.max(0, state.pulse.cooldown - dt);
+  }
+  if (state.pulse.remaining > 0) {
+    state.pulse.remaining = Math.max(0, state.pulse.remaining - dt);
+  }
+  if (state.pulse.wave > 0) {
+    state.pulse.wave = Math.max(0, state.pulse.wave - dt);
+  }
+  if (player.invulnerable > 0) {
+    player.invulnerable = Math.max(0, player.invulnerable - dt);
+  }
+}
 
-  const ground = groundLine(laneHeight);
-  if (player.y + player.height >= ground) {
-    player.y = ground - player.height;
-    player.vy = 0;
-    player.grounded = true;
+function updatePlayer(dt) {
+  const moveVector = { x: 0, y: 0 };
+  if (input.up) moveVector.y -= 1;
+  if (input.down) moveVector.y += 1;
+  if (input.left) moveVector.x -= 1;
+  if (input.right) moveVector.x += 1;
+
+  const moving = moveVector.x !== 0 || moveVector.y !== 0;
+  if (moving) {
+    const length = Math.hypot(moveVector.x, moveVector.y) || 1;
+    moveVector.x /= length;
+    moveVector.y /= length;
+    player.heading = Math.atan2(moveVector.y, moveVector.x);
+  }
+
+  let speed = config.playerSpeed;
+  if (input.sprint && moving && player.stamina > 0.05) {
+    speed *= config.sprintMultiplier;
+    player.stamina = Math.max(0, player.stamina - config.staminaDrainRate * dt);
   } else {
-    player.grounded = false;
+    player.stamina = Math.min(1, player.stamina + config.staminaRegenRate * dt);
   }
+
+  const dx = moveVector.x * speed * dt;
+  const dy = moveVector.y * speed * dt;
+  moveWithCollisions(player, dx, dy);
 }
 
-function tickPlayerTimers(player, dt) {
-  player.jumpFlash = Math.max(0, player.jumpFlash - dt);
-  player.dashCooldown = Math.max(0, player.dashCooldown - dt);
-  player.dashInvuln = Math.max(0, player.dashInvuln - dt);
-}
-
-function updateDashState(player, dt) {
-  if (player.dashing) {
-    player.dashElapsed = Math.min(config.dashDuration, player.dashElapsed + dt);
-    const progress = player.dashElapsed / config.dashDuration;
-    const eased = easeOutCubic(progress);
-    player.dashOffset = eased * config.dashDistance;
-    player.x = player.baseX + player.dashOffset;
-    if (player.dashElapsed >= config.dashDuration) {
-      player.dashing = false;
+function moveWithCollisions(entity, dx, dy) {
+  entity.x += dx;
+  clampToWorld(entity);
+  for (const ruin of ruins) {
+    if (circleRectIntersect(entity.x, entity.y, entity.radius, ruin)) {
+      if (dx > 0) {
+        entity.x = ruin.x - entity.radius;
+      } else if (dx < 0) {
+        entity.x = ruin.x + ruin.width + entity.radius;
+      }
     }
-  } else if (player.dashOffset > 0) {
-    const retreat = config.dashReturnSpeed * dt;
-    player.dashOffset = Math.max(0, player.dashOffset - retreat);
-    player.x = player.baseX + player.dashOffset;
-  } else {
-    player.x = player.baseX;
-    player.dashElapsed = 0;
+  }
+
+  entity.y += dy;
+  clampToWorld(entity);
+  for (const ruin of ruins) {
+    if (circleRectIntersect(entity.x, entity.y, entity.radius, ruin)) {
+      if (dy > 0) {
+        entity.y = ruin.y - entity.radius;
+      } else if (dy < 0) {
+        entity.y = ruin.y + ruin.height + entity.radius;
+      }
+    }
   }
 }
 
-function updateObstaclesAndCollisions(player, dt, laneHeight) {
-  const difficulty = Math.min(player.score / config.difficultyScoreSpan, config.maxDifficulty);
-  player.currentSpeed = config.baseSpeed + config.speedRamp * difficulty;
-  player.loadRatio = config.maxDifficulty > 0 ? difficulty / config.maxDifficulty : 0;
+function clampToWorld(entity) {
+  entity.x = clamp(entity.x, config.worldPadding, canvas.width - config.worldPadding);
+  entity.y = clamp(entity.y, config.worldPadding, canvas.height - config.worldPadding);
+}
 
-  player.spawnTimer -= dt;
-  if (player.spawnTimer <= 0) {
-    spawnObstacle(player, laneHeight);
-  }
-
-  let collided = false;
-  player.obstacles = player.obstacles.filter((obstacle) => {
-    obstacle.x -= player.currentSpeed * dt;
-    if (!collided && player.dashInvuln <= 0 && intersectsPlayer(player, obstacle)) {
-      collided = true;
+function updateArtifacts(dt) {
+  for (const artifact of artifacts) {
+    artifact.wobble += dt * 2.4;
+    artifact.flash = Math.max(0, artifact.flash - dt);
+    if (artifact.collected) continue;
+    const dist = distance(entityPosition(player), artifact);
+    if (dist <= player.radius + artifact.radius - 2) {
+      artifact.collected = true;
+      artifact.flash = 0.4;
+      state.score += 1;
+      if (state.score >= config.artifactGoal) {
+        winRun();
+      }
     }
-    return obstacle.x + obstacle.width > -40;
-  });
-
-  if (collided) {
-    endRun(player);
-    return true;
   }
-  return false;
+}
+
+function updateSentries(dt) {
+  let chasing = 0;
+  for (const sentinel of sentries) {
+    const target = sentinel.state === "chase" ? player : sentinel.path[sentinel.pathIndex];
+    const baseSpeed = sentinel.state === "chase" ? config.sentinelChaseSpeed : config.sentinelSpeed;
+    const slowFactor = state.pulse.remaining > 0 ? config.pulseSlowMultiplier : 1;
+    const speed = baseSpeed * slowFactor;
+    const angle = Math.atan2(target.y - sentinel.y, target.x - sentinel.x);
+    sentinel.x += Math.cos(angle) * speed * dt;
+    sentinel.y += Math.sin(angle) * speed * dt;
+
+    if (sentinel.state === "chase") {
+      sentinel.alertTimer = config.sentinelHoldTime;
+    }
+
+    const distToPlayer = distance(entityPosition(player), sentinel);
+    const vision = sentinel.vision;
+    if (distToPlayer <= vision) {
+      sentinel.state = "chase";
+    } else if (sentinel.state === "chase") {
+      sentinel.alertTimer -= dt;
+      if (sentinel.alertTimer <= 0) {
+        sentinel.state = "patrol";
+      }
+    }
+
+    if (sentinel.state !== "chase") {
+      const pathTarget = sentinel.path[sentinel.pathIndex];
+      if (distance(pathTarget, sentinel) < 6) {
+        sentinel.pathIndex = (sentinel.pathIndex + 1) % sentinel.path.length;
+      }
+    } else {
+      chasing += 1;
+    }
+
+    if (distToPlayer < sentinel.radius + player.radius - 4) {
+      handlePlayerHit();
+    }
+  }
+
+  state.alertLevel = chasing;
+}
+
+function handlePlayerHit() {
+  if (player.invulnerable > 0) return;
+  player.health -= 1;
+  player.invulnerable = 1.2;
+  player.x = spawnPoint.x;
+  player.y = spawnPoint.y;
+  player.stamina = 1;
+  if (player.health <= 0) {
+    endRun("Sentries overwhelmed the scout.");
+  }
 }
 
 function draw() {
-  const activePlayers = getActivePlayers();
-  if (!activePlayers.length) return;
-  const laneHeight = getLaneHeight(activePlayers.length);
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  activePlayers.forEach((player, index) => {
-    const offsetY = laneHeight * index;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, offsetY, canvas.width, laneHeight);
-    ctx.clip();
-    ctx.translate(0, offsetY);
-    drawLane(player, laneHeight);
-    ctx.restore();
-
-    if (state.mode === "duo" && index === 0) {
-      drawSplitDivider(offsetY + laneHeight);
-    }
-  });
-
+  drawBackdrop();
+  drawRuins();
+  drawArtifacts();
+  drawPulseWave();
+  drawSentries();
+  drawPlayer();
   drawOverlay();
 }
 
-function drawLane(player, laneHeight) {
-  drawLaneBackground(laneHeight);
-  drawBackgroundStreaks(player.score, laneHeight);
-  drawGround(laneHeight);
-  drawObstacles(player);
-  drawDashTrail(player);
-  drawPlayer(player);
-  drawJumpFlash(player, laneHeight);
-}
-
-function drawLaneBackground(laneHeight) {
-  const gradient = ctx.createLinearGradient(0, 0, 0, laneHeight);
-  gradient.addColorStop(0, "#162452");
-  gradient.addColorStop(0.5, "#0c1430");
-  gradient.addColorStop(1, "#050714");
+function drawBackdrop() {
+  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, "#051125");
+  gradient.addColorStop(1, "#020812");
   ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, laneHeight);
-}
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-function drawBackgroundStreaks(score = state.score, laneHeight = canvas.height) {
-  ctx.save();
-  ctx.strokeStyle = "rgba(94,245,255,0.12)";
+  ctx.strokeStyle = "rgba(94,245,255,0.05)";
   ctx.lineWidth = 1;
-  const width = canvas.width;
-  const offset = (score * 2) % width;
-  for (let i = -1; i < 3; i += 1) {
+  for (let x = 0; x <= canvas.width; x += 60) {
     ctx.beginPath();
-    const x = offset + i * (width / 3);
     ctx.moveTo(x, 0);
-    ctx.lineTo(x - width * 0.4, laneHeight);
+    ctx.lineTo(x, canvas.height);
     ctx.stroke();
   }
-  ctx.restore();
+  for (let y = 0; y <= canvas.height; y += 60) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
 }
 
-function drawGround(laneHeight = canvas.height) {
-  const ground = groundLine(laneHeight);
+function drawRuins() {
+  for (const ruin of ruins) {
+    ctx.fillStyle = "rgba(14, 24, 46, 0.92)";
+    ctx.strokeStyle = "rgba(94,245,255,0.2)";
+    ctx.lineWidth = 2;
+    roundedRectPath(ruin.x, ruin.y, ruin.width, ruin.height, 14);
+    ctx.fill();
+    ctx.stroke();
+  }
+}
+
+function drawArtifacts() {
+  for (const artifact of artifacts) {
+    const wobble = Math.sin(artifact.wobble) * 4;
+    const radius = artifact.radius + wobble * 0.2;
+    const gradient = ctx.createRadialGradient(artifact.x, artifact.y, radius * 0.2, artifact.x, artifact.y, radius);
+    const baseColor = artifact.collected ? "rgba(255,255,255,0.02)" : "rgba(94,245,255,0.6)";
+    gradient.addColorStop(0, "#fef9d7");
+    gradient.addColorStop(0.6, artifact.collected ? "rgba(255,255,255,0.08)" : "rgba(94,245,255,0.7)");
+    gradient.addColorStop(1, artifact.collected ? "rgba(94,245,255,0.08)" : "rgba(94,245,255,0)");
+    ctx.beginPath();
+    ctx.fillStyle = gradient;
+    ctx.arc(artifact.x, artifact.y - wobble, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (artifact.flash > 0) {
+      ctx.save();
+      ctx.globalAlpha = artifact.flash * 2;
+      ctx.strokeStyle = "rgba(255,255,255,0.6)";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(artifact.x, artifact.y - wobble, radius + artifact.flash * 40, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+}
+
+function drawPulseWave() {
+  if (state.pulse.wave <= 0) return;
+  const ratio = state.pulse.wave / config.pulseDuration;
+  const radius = (1 - ratio) * Math.max(canvas.width, canvas.height) * 1.2;
   ctx.save();
-  ctx.fillStyle = "#060b1d";
-  ctx.fillRect(0, ground, canvas.width, laneHeight - ground);
-  ctx.fillStyle = "rgba(94,245,255,0.08)";
-  ctx.fillRect(0, ground - 10, canvas.width, 10);
-  ctx.strokeStyle = "rgba(94,245,255,0.45)";
-  ctx.lineWidth = 2;
+  const gradient = ctx.createRadialGradient(player.x, player.y, radius * 0.1, player.x, player.y, radius);
+  gradient.addColorStop(0, "rgba(94,245,255,0.35)");
+  gradient.addColorStop(1, "rgba(94,245,255,0)");
+  ctx.fillStyle = gradient;
   ctx.beginPath();
-  ctx.moveTo(0, ground);
-  ctx.lineTo(canvas.width, ground);
-  ctx.stroke();
+  ctx.arc(player.x, player.y, radius, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
-function drawObstacles(player) {
-  for (const obstacle of player.obstacles) {
-    drawRoundedRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height, 10, obstacle.color);
+function drawSentries() {
+  for (const sentinel of sentries) {
     ctx.save();
-    ctx.fillStyle = "rgba(255,255,255,0.12)";
-    ctx.fillRect(obstacle.x + 4, obstacle.y + 4, obstacle.width - 8, 2);
+    ctx.strokeStyle = sentinel.state === "chase" ? "rgba(255,122,122,0.25)" : "rgba(255,255,255,0.08)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 10]);
+    ctx.beginPath();
+    ctx.arc(sentinel.x, sentinel.y, sentinel.vision, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.fillStyle = sentinel.state === "chase" ? "#ff7a7a" : "#f9c86b";
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.beginPath();
+    ctx.arc(sentinel.x, sentinel.y, sentinel.radius, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
 }
 
-function drawDashTrail(player) {
-  if (!player.dashing && player.dashOffset <= 0) return;
-  const ratio = player.dashing ? 1 : player.dashOffset / config.dashDistance;
-  if (!Number.isFinite(ratio) || ratio <= 0) return;
-  const width = player.width + player.dashOffset + 28;
-  const height = player.height + 24;
-  const x = player.x + player.width - width;
-  const y = player.y - 12;
+function drawPlayer() {
   ctx.save();
-  ctx.globalAlpha = 0.08 + ratio * 0.4;
-  ctx.filter = "blur(4px)";
-  ctx.fillStyle = player.accentColor;
-  ctx.fillRect(x, y, width, height);
-  ctx.restore();
-}
-
-function drawPlayer(player) {
-  drawRoundedRect(player.x, player.y, player.width, player.height, 12, player.bodyColor);
-  ctx.save();
-  ctx.fillStyle = "rgba(15,22,49,0.9)";
-  ctx.fillRect(player.x + 12, player.y + 16, player.width - 24, 10);
-  ctx.fillRect(player.x + 14, player.y + 32, player.width - 28, 12);
-  ctx.fillStyle = player.accentColor;
-  ctx.fillRect(player.x + player.width - 10, player.y + player.height - 18, 6, 14);
-  ctx.restore();
-}
-
-function drawJumpFlash(player, laneHeight) {
-  if (player.jumpFlash <= 0) return;
-  ctx.save();
-  const ratio = player.jumpFlash / config.jumpFlashLife;
-  ctx.strokeStyle = `rgba(94,245,255,${ratio * 0.9})`;
-  ctx.lineWidth = 6 * ratio;
-  const cx = player.x + player.width / 2;
-  const cy = groundLine(laneHeight);
-  const rx = 24 + (1 - ratio) * 50;
-  const ry = 10 + (1 - ratio) * 16;
+  ctx.fillStyle = "#fefefe";
+  ctx.shadowColor = "rgba(94,245,255,0.6)";
+  ctx.shadowBlur = 20;
   ctx.beginPath();
-  ctx.ellipse(cx, cy + 6, rx, ry, 0, 0, Math.PI * 2);
+  ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  const indicatorLength = player.radius + 12;
+  ctx.strokeStyle = "#5ef5ff";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(player.x, player.y);
+  ctx.lineTo(
+    player.x + Math.cos(player.heading) * indicatorLength,
+    player.y + Math.sin(player.heading) * indicatorLength
+  );
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(94,245,255,0.65)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(
+    player.x,
+    player.y,
+    player.radius + 10,
+    -Math.PI / 2,
+    -Math.PI / 2 + Math.PI * 2 * player.stamina
+  );
   ctx.stroke();
   ctx.restore();
-}
 
-function drawSplitDivider(yPosition) {
-  ctx.save();
-  ctx.strokeStyle = "rgba(94,245,255,0.28)";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([6, 10]);
-  ctx.beginPath();
-  ctx.moveTo(0, yPosition);
-  ctx.lineTo(canvas.width, yPosition);
-  ctx.stroke();
-  ctx.restore();
+  if (player.invulnerable > 0) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.6)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.radius + 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function drawOverlay() {
-  if (state.phase !== "over") return;
+  if (state.phase !== "over" && state.phase !== "won") return;
   ctx.save();
-  ctx.fillStyle = "rgba(5, 6, 18, 0.65)";
+  ctx.fillStyle = "rgba(2, 8, 16, 0.75)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = "#fefefe";
-  ctx.font = "700 36px Montserrat, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("Run Over", canvas.width / 2, canvas.height / 2 - 10);
+  ctx.font = "700 36px Montserrat, sans-serif";
+  const title = state.phase === "won" ? "Extraction Ready" : "Run Lost";
+  ctx.fillText(title, canvas.width / 2, canvas.height / 2 - 10);
   ctx.font = "600 18px Montserrat, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.8)";
-  ctx.fillText("Tap Play to try again", canvas.width / 2, canvas.height / 2 + 22);
+  ctx.fillText("Tap Play to deploy again", canvas.width / 2, canvas.height / 2 + 24);
   ctx.restore();
 }
 
-function spawnObstacle(player, laneHeight) {
-  const height = rand(config.obstacleHeight.min, config.obstacleHeight.max);
-  const width = rand(config.obstacleWidth.min, config.obstacleWidth.max);
-  const x = canvas.width + width;
-  const y = groundLine(laneHeight) - height;
-  const color = config.colors[Math.floor(Math.random() * config.colors.length)];
-  player.obstacles.push({ x, y, width, height, color });
-  const cadenceTrim = Math.min(player.score / 700, 0.6);
-  player.spawnTimer = config.spawnBase - cadenceTrim + Math.random() * config.spawnVariance;
-}
-
-function handleJumpRequest(playerIndex = 0) {
-  const activePlayers = getActivePlayers();
-  const player = activePlayers[playerIndex] ?? activePlayers[0];
-  if (!player) return;
-  if (state.phase === "idle" || state.phase === "over") {
-    startRun();
-  } else if (state.phase === "playing" && state.paused) {
-    resumeRun();
-  }
-  jump(player);
-}
-
-function handleDashRequest(playerIndex = 0) {
-  const activePlayers = getActivePlayers();
-  const player = activePlayers[playerIndex] ?? activePlayers[0];
-  if (!player) return;
-  if (state.phase === "idle" || state.phase === "over") {
-    startRun();
-  } else if (state.phase === "playing" && state.paused) {
-    resumeRun();
-  }
-  dash(player);
-}
-
-function jump(player) {
-  if (!player) return;
+function triggerPulse() {
   if (state.phase !== "playing" || state.paused) return;
-  if (!player.grounded) return;
-  player.vy = -config.jumpForce;
-  player.grounded = false;
-  player.jumpFlash = config.jumpFlashLife;
+  if (state.pulse.cooldown > 0) return;
+  state.pulse.cooldown = config.pulseCooldown;
+  state.pulse.remaining = config.pulseDuration;
+  state.pulse.wave = config.pulseDuration;
 }
 
-function dash(player) {
-  if (!player) return;
-  if (state.phase !== "playing" || state.paused) return;
-  if (player.dashing || player.dashCooldown > 0) return;
-  player.dashing = true;
-  player.dashOffset = 0;
-  player.dashElapsed = 0;
-  player.dashCooldown = config.dashCooldown;
-  player.dashInvuln = config.dashInvulnerableWindow;
-  player.jumpFlash = Math.max(player.jumpFlash, config.jumpFlashLife * 0.6);
+function updateScoreUI() {
+  const scoreValue = Math.max(0, Math.floor(state.score));
+  if (ui.score) ui.score.textContent = `${scoreValue}`;
+  if (scoreValue > state.best) {
+    state.best = scoreValue;
+    saveBestScore(scoreValue);
+  }
+  if (ui.best) ui.best.textContent = `${state.best}`;
+}
+
+function updateThreatReadout() {
+  if (!ui.threat) return;
+  const labels = ["Calm", "Tracking", "Hunted", "Critical"];
+  const index = clamp(Math.floor(state.alertLevel), 0, labels.length - 1);
+  ui.threat.textContent = labels[index];
+}
+
+function updateLoadBar() {
+  if (!ui.loadFill || !ui.loadTrack || !ui.loadText) return;
+  const ratio = config.pulseCooldown > 0 ? 1 - state.pulse.cooldown / config.pulseCooldown : 1;
+  const clamped = clamp(ratio, 0, 1);
+  const percent = Math.round(clamped * 100);
+  ui.loadFill.style.width = `${percent}%`;
+  ui.loadTrack.setAttribute("aria-valuenow", percent.toString());
+  ui.loadText.textContent = percent >= 100 ? "Ready" : `${percent}%`;
+}
+
+function getStatusMessage() {
+  const remaining = Math.max(0, config.artifactGoal - state.score);
+  if (state.phase === "idle") {
+    return `Tap Play to deploy. Collect ${config.artifactGoal} skyshards.`;
+  }
+  if (state.phase === "playing") {
+    return state.paused
+      ? "Paused — press Play or P."
+      : `${remaining} artifacts remain • Hearts ${player.health}/${config.maxHearts}`;
+  }
+  if (state.phase === "won") {
+    return "All shards secured. Extraction shuttle inbound.";
+  }
+  return "Sentries overwhelmed the scout. Tap Play to retry.";
+}
+
+function setStatusText(message) {
+  if (ui.status) {
+    ui.status.textContent = message;
+  }
+}
+
+function resetWorld() {
+  resetPlayerState();
+  sentries = sentinelPresets.map(createSentinel);
+  artifacts = [];
+  spawnArtifacts(config.artifactGoal);
+}
+
+function resetPlayerState() {
+  player.x = spawnPoint.x;
+  player.y = spawnPoint.y;
+  player.radius = config.playerRadius;
+  player.heading = -Math.PI / 2;
+  player.stamina = 1;
+  player.invulnerable = 0;
+  player.health = config.maxHearts;
+}
+
+function spawnArtifacts(targetCount) {
+  let attempts = 0;
+  while (artifacts.length < targetCount && attempts < 600) {
+    attempts += 1;
+    const candidate = {
+      x: randBetween(config.worldPadding, canvas.width - config.worldPadding),
+      y: randBetween(config.worldPadding, canvas.height - config.worldPadding),
+      radius: randBetween(14, 20),
+      wobble: Math.random() * Math.PI * 2,
+      flash: 0,
+      collected: false,
+    };
+    const intersectsRuin = ruins.some((zone) => circleRectIntersect(candidate.x, candidate.y, candidate.radius + 6, zone));
+    if (!intersectsRuin) {
+      artifacts.push(candidate);
+    }
+  }
 }
 
 function startRun() {
   state.phase = "playing";
   state.paused = false;
   state.score = 0;
-  state.currentSpeed = config.baseSpeed;
-  state.loadRatio = 0;
-  state.lastLoser = null;
-  resetPlayersForMode();
+  state.alertLevel = 0;
+  state.pulse.cooldown = 0;
+  state.pulse.remaining = 0;
+  state.pulse.wave = 0;
+  resetWorld();
   updateScoreUI();
-  updateSpeedReadout();
-  updateLoadBar(0);
+  updateThreatReadout();
+  updateLoadBar();
   setStatusText(getStatusMessage());
   updateControls();
 }
 
-function resetToIdle(message) {
+function resetToIdle() {
   state.phase = "idle";
   state.paused = true;
   state.score = 0;
-  state.currentSpeed = config.baseSpeed;
-  state.loadRatio = 0;
-  state.lastLoser = null;
-  resetPlayersForMode(config.spawnBase);
+  state.alertLevel = 0;
+  state.pulse.cooldown = 0;
+  state.pulse.remaining = 0;
+  state.pulse.wave = 0;
+  resetWorld();
   updateScoreUI();
-  updateSpeedReadout();
-  updateLoadBar(0);
-  setStatusText(message ?? getStatusMessage());
+  updateThreatReadout();
+  updateLoadBar();
+  setStatusText(getStatusMessage());
   updateControls();
 }
 
@@ -534,164 +676,68 @@ function resumeRun() {
   updateControls();
 }
 
-function endRun(loser) {
+function winRun() {
+  state.phase = "won";
+  state.paused = true;
+  updateScoreUI();
+  updateControls();
+  setStatusText(getStatusMessage());
+}
+
+function endRun(reason) {
   state.phase = "over";
   state.paused = true;
-  state.lastLoser = loser?.label ?? null;
-  for (const player of players) {
-    player.jumpFlash = 0;
-    player.dashing = false;
-    player.dashInvuln = 0;
-    player.dashOffset = 0;
-    player.dashElapsed = 0;
-    player.dashCooldown = 0;
-    player.x = player.baseX;
-  }
-  setStatusText(getStatusMessage());
+  state.lastOutcome = reason;
   updateControls();
-}
-
-function updateScoreUI() {
-  const scoreValue = Math.max(0, Math.floor(state.score));
-  if (ui.score) ui.score.textContent = scoreValue.toString();
-  if (scoreValue > state.best) {
-    state.best = scoreValue;
-    saveBestScore(scoreValue);
-  }
-  if (ui.best) ui.best.textContent = state.best.toString();
-}
-
-function updateSpeedReadout() {
-  const multiplier = (state.currentSpeed / config.baseSpeed).toFixed(1);
-  if (ui.speed) {
-    ui.speed.textContent = `${multiplier}x`;
-  }
-}
-
-function updateLoadBar(ratio = state.loadRatio) {
-  const safeRatio = Number.isFinite(ratio) ? ratio : 0;
-  const clamped = Math.max(0, Math.min(safeRatio, 1));
-  const percent = Math.round(clamped * 100);
-
-  if (ui.loadFill) {
-    ui.loadFill.style.width = `${percent}%`;
-  }
-  if (ui.loadTrack) {
-    ui.loadTrack.setAttribute("aria-valuenow", percent.toString());
-  }
-  if (ui.loadText) {
-    ui.loadText.textContent = `${percent}%`;
-  }
+  setStatusText(getStatusMessage());
 }
 
 function updateControls() {
   if (controls.pause) {
     controls.pause.disabled = state.phase !== "playing";
-    controls.pause.textContent = state.phase === "playing" && state.paused ? "Resume" : "Pause";
+    controls.pause.textContent = state.paused ? "Resume" : "Pause";
   }
   if (controls.play) {
     let label = "Play";
     if (state.phase === "playing") {
       label = state.paused ? "Resume" : "Restart";
+    } else if (state.phase === "won") {
+      label = "Replay";
     } else if (state.phase === "over") {
       label = "Play Again";
     }
     controls.play.textContent = label;
   }
-  updateModeButtons();
 }
 
-function setStatusText(message) {
-  if (ui.status) {
-    ui.status.textContent = message;
-  }
+function createPlayer() {
+  return {
+    x: spawnPoint.x,
+    y: spawnPoint.y,
+    radius: config.playerRadius,
+    heading: -Math.PI / 2,
+    stamina: 1,
+    invulnerable: 0,
+    health: config.maxHearts,
+  };
 }
 
-function updateModeButtons() {
-  for (const button of modeButtons) {
-    if (!button) continue;
-    const targetMode = button.dataset.mode === "duo" ? "duo" : "solo";
-    const isActive = targetMode === state.mode;
-    button.classList.toggle("active", isActive);
-    button.setAttribute("aria-pressed", String(isActive));
-    button.disabled = state.phase === "playing";
-  }
+function createSentinel({ path, vision = config.sentinelVision }) {
+  const start = path[0];
+  return {
+    x: start.x,
+    y: start.y,
+    radius: config.sentinelRadius,
+    path,
+    pathIndex: 1 % path.length,
+    state: "patrol",
+    alertTimer: config.sentinelHoldTime,
+    vision,
+  };
 }
 
-function getStatusMessage() {
-  const controlHelp =
-    state.mode === "duo"
-      ? "Runner One — Space/W/Click. Runner Two — Arrow Up/L/Numpad8."
-      : "Jump with Space, W, click, or Arrow Up.";
-  if (state.phase === "idle") return `Tap Play to begin. ${controlHelp}`;
-  if (state.phase === "playing") {
-    return state.paused ? "Paused — press Play or P." : controlHelp;
-  }
-  const loserMessage = state.lastLoser ? `${state.lastLoser} clipped a block!` : "You clipped a block!";
-  return `${loserMessage} Tap Play to retry.`;
-}
-
-function resetPlayersForMode(initialSpawn = config.spawnBase) {
-  for (const player of players) {
-    resetPlayerLane(player, initialSpawn);
-  }
-  placePlayers();
-}
-
-function resetPlayerLane(player, initialSpawn = config.spawnBase) {
-  player.obstacles = [];
-  player.spawnTimer = initialSpawn;
-  player.score = 0;
-  player.currentSpeed = config.baseSpeed;
-  player.loadRatio = 0;
-  player.jumpFlash = 0;
-  player.vy = 0;
-  player.grounded = true;
-  player.dashOffset = 0;
-  player.dashElapsed = 0;
-  player.dashing = false;
-  player.dashCooldown = 0;
-  player.dashInvuln = 0;
-  player.baseX = player.startX;
-  player.x = player.baseX;
-}
-
-function placePlayers() {
-  const activeCount = state.mode === "duo" ? 2 : 1;
-  const laneHeight = getLaneHeight(activeCount);
-  const ground = groundLine(laneHeight);
-  for (const player of players) {
-    player.y = ground - player.height;
-  }
-}
-
-function getActivePlayers() {
-  const count = state.mode === "duo" ? 2 : 1;
-  return players.slice(0, count);
-}
-
-function getLaneHeight(activeCount = getActivePlayers().length || 1) {
-  const lanes = Math.max(1, activeCount);
-  return canvas.height / lanes;
-}
-
-function setPlayerMode(nextMode) {
-  const normalized = nextMode === "duo" ? "duo" : "solo";
-  if (state.mode === normalized) return;
-  if (state.phase === "playing") return;
-  state.mode = normalized;
-  resetToIdle();
-  updateModeButtons();
-}
-
-function groundLine(laneHeight = canvas.height) {
-  return laneHeight - config.groundOffset;
-}
-
-function drawRoundedRect(x, y, width, height, radius, color) {
-  ctx.save();
+function roundedRectPath(x, y, width, height, radius) {
   const r = Math.min(radius, width / 2, height / 2);
-  ctx.fillStyle = color;
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.lineTo(x + width - r, y);
@@ -703,53 +749,40 @@ function drawRoundedRect(x, y, width, height, radius, color) {
   ctx.lineTo(x, y + r);
   ctx.quadraticCurveTo(x, y, x + r, y);
   ctx.closePath();
-  ctx.fill();
-  ctx.restore();
 }
 
-function intersectsPlayer(player, obstacle) {
-  return !(
-    player.x + player.width < obstacle.x ||
-    player.x > obstacle.x + obstacle.width ||
-    player.y + player.height < obstacle.y ||
-    player.y > obstacle.y + obstacle.height
-  );
+function circleRectIntersect(cx, cy, radius, rect) {
+  const closestX = clamp(cx, rect.x, rect.x + rect.width);
+  const closestY = clamp(cy, rect.y, rect.y + rect.height);
+  const dx = cx - closestX;
+  const dy = cy - closestY;
+  return dx * dx + dy * dy < radius * radius;
 }
 
-function createPlayer({ label, startX, bodyColor, accentColor }) {
-  return {
-    label,
-    startX,
-    width: 46,
-    height: 54,
-    baseX: startX,
-    x: startX,
-    y: 0,
-    vy: 0,
-    grounded: true,
-    bodyColor,
-    accentColor,
-    jumpFlash: 0,
-    obstacles: [],
-    spawnTimer: config.spawnBase,
-    score: 0,
-    currentSpeed: config.baseSpeed,
-    loadRatio: 0,
-    dashOffset: 0,
-    dashElapsed: 0,
-    dashing: false,
-    dashCooldown: 0,
-    dashInvuln: 0,
-  };
+function distance(a, b) {
+  const dx = (a.x - b.x) || 0;
+  const dy = (a.y - b.y) || 0;
+  return Math.hypot(dx, dy);
 }
 
-function rand(min, max) {
+function entityPosition(entity) {
+  return { x: entity.x, y: entity.y };
+}
+
+function randBetween(min, max) {
   return Math.random() * (max - min) + min;
 }
 
-function easeOutCubic(value) {
-  const clamped = Math.max(0, Math.min(1, value));
-  return 1 - Math.pow(1 - clamped, 3);
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function saveBestScore(value) {
+  try {
+    localStorage.setItem(BEST_KEY, String(value));
+  } catch (error) {
+    console.error("Failed to save best score", error);
+  }
 }
 
 function loadBestScore() {
@@ -758,15 +791,7 @@ function loadBestScore() {
     const value = Number(raw);
     return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
   } catch (error) {
-    console.error("Failed to read best score:", error);
+    console.error("Failed to read best score", error);
     return 0;
-  }
-}
-
-function saveBestScore(value) {
-  try {
-    localStorage.setItem(BEST_KEY, String(value));
-  } catch (error) {
-    console.error("Failed to save best score:", error);
   }
 }
