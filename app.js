@@ -13,6 +13,7 @@ const ui = {
   loadTrack: document.getElementById("load-track"),
   loadFill: document.getElementById("load-fill"),
   loadText: document.getElementById("load-text"),
+  objective: document.getElementById("objective-value"),
 };
 
 const controls = {
@@ -40,6 +41,7 @@ const config = {
   sentinelRadius: 22,
   pulseSlowMultiplier: 0.35,
   maxHearts: 3,
+  extractionRadius: 60,
 };
 
 const spawnPoint = { x: canvas.width / 2, y: canvas.height - 110 };
@@ -110,6 +112,8 @@ const state = {
   lastTime: performance.now(),
   pulse: { cooldown: 0, remaining: 0, wave: 0 },
   lastOutcome: "",
+  extractionActive: false,
+  extractionPoint: selectExtractionPoint(),
 };
 
 init();
@@ -215,10 +219,12 @@ function update(dt) {
   updatePulse(dt);
   updatePlayer(dt);
   updateArtifacts(dt);
+  checkExtractionProgress();
   updateSentries(dt);
   updateScoreUI();
   updateThreatReadout();
   updateLoadBar();
+  updateObjectiveReadout();
   setStatusText(getStatusMessage());
 }
 
@@ -306,10 +312,22 @@ function updateArtifacts(dt) {
       artifact.collected = true;
       artifact.flash = 0.4;
       state.score += 1;
-      if (state.score >= config.artifactGoal) {
-        winRun();
-      }
     }
+  }
+}
+
+function checkExtractionProgress() {
+  if (!state.extractionActive && state.score >= config.artifactGoal) {
+    state.extractionActive = true;
+    updateObjectiveReadout();
+    setStatusText(getStatusMessage());
+  }
+
+  if (
+    state.extractionActive &&
+    distance(entityPosition(player), state.extractionPoint) <= config.extractionRadius + player.radius - 6
+  ) {
+    winRun();
   }
 }
 
@@ -372,6 +390,7 @@ function draw() {
   drawBackdrop();
   drawRuins();
   drawArtifacts();
+  drawExtractionZone();
   drawPulseWave();
   drawSentries();
   drawPlayer();
@@ -437,6 +456,44 @@ function drawArtifacts() {
       ctx.restore();
     }
   }
+}
+
+function drawExtractionZone() {
+  const target = state.extractionPoint;
+  if (!target) return;
+  const radius = config.extractionRadius;
+  const time = performance.now() / 600;
+  const pulse = (Math.sin(time * 2) + 1) * 0.5;
+  const outerRadius = radius + 12 + pulse * 20;
+
+  ctx.save();
+  const gradient = ctx.createRadialGradient(target.x, target.y, radius * 0.4, target.x, target.y, outerRadius);
+  if (state.extractionActive) {
+    gradient.addColorStop(0, "rgba(94,245,255,0.6)");
+    gradient.addColorStop(1, "rgba(94,245,255,0)");
+  } else {
+    gradient.addColorStop(0, "rgba(255,192,125,0.35)");
+    gradient.addColorStop(1, "rgba(255,192,125,0)");
+  }
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(target.x, target.y, outerRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = state.extractionActive ? "#5ef5ff" : "rgba(255,198,155,0.7)";
+  ctx.lineWidth = state.extractionActive ? 3 : 2;
+  ctx.setLineDash(state.extractionActive ? [] : [10, 8]);
+  ctx.beginPath();
+  ctx.arc(target.x, target.y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.font = "600 14px Montserrat, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillStyle = state.extractionActive ? "#c8feff" : "rgba(255,233,208,0.85)";
+  ctx.fillText(state.extractionActive ? "EVAC READY" : "EVAC LOCKED", target.x, target.y - radius - 12);
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.fillText("EVAC FLARE", target.x, target.y + radius + 22);
+  ctx.restore();
 }
 
 function drawPulseWave() {
@@ -547,7 +604,7 @@ function triggerPulse() {
 
 function updateScoreUI() {
   const scoreValue = Math.max(0, Math.floor(state.score));
-  if (ui.score) ui.score.textContent = `${scoreValue}`;
+  if (ui.score) ui.score.textContent = `${scoreValue}/${config.artifactGoal}`;
   if (scoreValue > state.best) {
     state.best = scoreValue;
     saveBestScore(scoreValue);
@@ -572,15 +629,41 @@ function updateLoadBar() {
   ui.loadText.textContent = percent >= 100 ? "Ready" : `${percent}%`;
 }
 
+function updateObjectiveReadout() {
+  if (!ui.objective) return;
+  let message = "Standby";
+  if (state.phase === "idle") {
+    message = `Collect ${config.artifactGoal} shards`;
+  } else if (state.phase === "playing") {
+    if (state.paused) {
+      message = "Paused";
+    } else if (state.extractionActive) {
+      message = "Reach evac flare";
+    } else {
+      const remaining = Math.max(0, config.artifactGoal - state.score);
+      message = `${remaining} shards left`;
+    }
+  } else if (state.phase === "won") {
+    message = "Extraction complete";
+  } else if (state.phase === "over") {
+    message = "Recon failed";
+  }
+  ui.objective.textContent = message;
+}
+
 function getStatusMessage() {
   const remaining = Math.max(0, config.artifactGoal - state.score);
   if (state.phase === "idle") {
     return `Tap Play to deploy. Collect ${config.artifactGoal} skyshards.`;
   }
   if (state.phase === "playing") {
-    return state.paused
-      ? "Paused — press Play or P."
-      : `${remaining} artifacts remain • Hearts ${player.health}/${config.maxHearts}`;
+    if (state.paused) {
+      return "Paused — press Play or P.";
+    }
+    if (state.extractionActive) {
+      return `All shards secured — reach the evac flare! • Hearts ${player.health}/${config.maxHearts}`;
+    }
+    return `${remaining} artifacts remain • Hearts ${player.health}/${config.maxHearts}`;
   }
   if (state.phase === "won") {
     return "All shards secured. Extraction shuttle inbound.";
@@ -596,6 +679,8 @@ function setStatusText(message) {
 
 function resetWorld() {
   resetPlayerState();
+  state.extractionActive = false;
+  state.extractionPoint = selectExtractionPoint();
   sentries = sentinelPresets.map(createSentinel);
   artifacts = [];
   spawnArtifacts(config.artifactGoal);
@@ -630,6 +715,25 @@ function spawnArtifacts(targetCount) {
   }
 }
 
+function selectExtractionPoint() {
+  let attempts = 0;
+  const padding = config.worldPadding + config.extractionRadius + 10;
+  while (attempts < 400) {
+    attempts += 1;
+    const candidate = {
+      x: randBetween(padding, canvas.width - padding),
+      y: randBetween(padding, canvas.height - padding),
+    };
+    const intersectsRuin = ruins.some((zone) =>
+      circleRectIntersect(candidate.x, candidate.y, config.extractionRadius + 18, zone)
+    );
+    if (!intersectsRuin) {
+      return candidate;
+    }
+  }
+  return { x: canvas.width / 2, y: canvas.height / 2 };
+}
+
 function startRun() {
   state.phase = "playing";
   state.paused = false;
@@ -642,6 +746,7 @@ function startRun() {
   updateScoreUI();
   updateThreatReadout();
   updateLoadBar();
+  updateObjectiveReadout();
   setStatusText(getStatusMessage());
   updateControls();
 }
@@ -658,6 +763,7 @@ function resetToIdle() {
   updateScoreUI();
   updateThreatReadout();
   updateLoadBar();
+  updateObjectiveReadout();
   setStatusText(getStatusMessage());
   updateControls();
 }
@@ -666,6 +772,7 @@ function pauseRun() {
   if (state.phase !== "playing" || state.paused) return;
   state.paused = true;
   setStatusText(getStatusMessage());
+  updateObjectiveReadout();
   updateControls();
 }
 
@@ -673,23 +780,28 @@ function resumeRun() {
   if (state.phase !== "playing" || !state.paused) return;
   state.paused = false;
   setStatusText(getStatusMessage());
+  updateObjectiveReadout();
   updateControls();
 }
 
 function winRun() {
   state.phase = "won";
   state.paused = true;
+  state.extractionActive = false;
   updateScoreUI();
   updateControls();
   setStatusText(getStatusMessage());
+  updateObjectiveReadout();
 }
 
 function endRun(reason) {
   state.phase = "over";
   state.paused = true;
   state.lastOutcome = reason;
+  state.extractionActive = false;
   updateControls();
   setStatusText(getStatusMessage());
+  updateObjectiveReadout();
 }
 
 function updateControls() {
