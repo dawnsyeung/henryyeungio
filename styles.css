@@ -145,6 +145,12 @@ h1 {
   text-shadow: var(--glow);
 }
 
+.stat .value-sm {
+  font-size: 1.25rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .gun-name {
   font-size: 1.3rem;
   color: var(--accent-strong);
