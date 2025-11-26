@@ -37,6 +37,11 @@ const config = {
   obstacleHeight: { min: 38, max: 118 },
   scoreRate: 0.02,
   jumpFlashLife: 0.18,
+  dashDistance: 48,
+  dashDuration: 0.2,
+  dashCooldown: 1.05,
+  dashReturnSpeed: 140,
+  dashInvulnerableWindow: 0.16,
   colors: ["#5ef5ff", "#7f74ff", "#ff84d8", "#4de0c2"],
 };
 
@@ -74,6 +79,15 @@ const jumpKeyBindings = new Map([
   ["ArrowUp", 1],
   ["KeyL", 1],
   ["Numpad8", 1],
+]);
+
+const dashKeyBindings = new Map([
+  ["ShiftLeft", 0],
+  ["KeyQ", 0],
+  ["KeyD", 0],
+  ["ShiftRight", 1],
+  ["ArrowRight", 1],
+  ["KeyO", 1],
 ]);
 
 init();
@@ -114,6 +128,12 @@ function attachEvents() {
     if (jumpPlayerIndex !== undefined) {
       event.preventDefault();
       handleJumpRequest(jumpPlayerIndex);
+      return;
+    }
+    const dashPlayerIndex = dashKeyBindings.get(event.code);
+    if (dashPlayerIndex !== undefined) {
+      event.preventDefault();
+      handleDashRequest(dashPlayerIndex);
       return;
     }
     if (event.code === "KeyP") {
@@ -161,6 +181,9 @@ function update(dt) {
     }
 
     player.jumpFlash = Math.max(0, player.jumpFlash - dt);
+    player.dashCooldown = Math.max(0, player.dashCooldown - dt);
+    player.dashInvuln = Math.max(0, player.dashInvuln - dt);
+    updateDashState(player, dt);
   }
 
   const difficulty = Math.min(state.score / config.difficultyScoreSpan, config.maxDifficulty);
@@ -179,6 +202,7 @@ function update(dt) {
 
   for (const obstacle of state.obstacles) {
     for (const player of players) {
+      if (player.dashInvuln > 0) continue;
       if (intersectsPlayer(player, obstacle)) {
         endRun(player);
         return;
@@ -206,6 +230,7 @@ function draw() {
   drawBackgroundStreaks();
   drawGround();
   drawObstacles();
+  drawDashTrails();
   drawPlayers();
   drawJumpFlash();
   drawOverlay();
@@ -250,6 +275,23 @@ function drawObstacles() {
     ctx.fillStyle = "rgba(255,255,255,0.12)";
     ctx.fillRect(obstacle.x + 4, obstacle.y + 4, obstacle.width - 8, 2);
   }
+}
+
+function drawDashTrails() {
+  ctx.save();
+  for (const player of players) {
+    const ratio = player.dashing ? 1 : player.dashOffset / config.dashDistance;
+    if (!Number.isFinite(ratio) || ratio <= 0) continue;
+    const width = player.width + player.dashOffset + 28;
+    const height = player.height + 24;
+    const x = player.x + player.width - width;
+    const y = player.y - 12;
+    ctx.globalAlpha = 0.08 + ratio * 0.4;
+    ctx.filter = "blur(4px)";
+    ctx.fillStyle = player.accentColor;
+    ctx.fillRect(x, y, width, height);
+  }
+  ctx.restore();
 }
 
 function drawPlayers() {
@@ -302,6 +344,26 @@ function drawOverlay() {
   ctx.restore();
 }
 
+function updateDashState(player, dt) {
+  if (player.dashing) {
+    player.dashElapsed = Math.min(config.dashDuration, player.dashElapsed + dt);
+    const progress = player.dashElapsed / config.dashDuration;
+    const eased = easeOutCubic(progress);
+    player.dashOffset = eased * config.dashDistance;
+    player.x = player.baseX + player.dashOffset;
+    if (player.dashElapsed >= config.dashDuration) {
+      player.dashing = false;
+    }
+  } else if (player.dashOffset > 0) {
+    const retreat = config.dashReturnSpeed * dt;
+    player.dashOffset = Math.max(0, player.dashOffset - retreat);
+    player.x = player.baseX + player.dashOffset;
+  } else {
+    player.x = player.baseX;
+    player.dashElapsed = 0;
+  }
+}
+
 function spawnObstacle() {
   const height = rand(config.obstacleHeight.min, config.obstacleHeight.max);
   const width = rand(config.obstacleWidth.min, config.obstacleWidth.max);
@@ -324,6 +386,17 @@ function handleJumpRequest(playerIndex = 0) {
   jump(player);
 }
 
+function handleDashRequest(playerIndex = 0) {
+  const player = players[playerIndex];
+  if (!player) return;
+  if (state.phase === "idle" || state.phase === "over") {
+    startRun();
+  } else if (state.phase === "playing" && state.paused) {
+    resumeRun();
+  }
+  dash(player);
+}
+
 function jump(player) {
   if (!player) return;
   if (state.phase !== "playing" || state.paused) return;
@@ -331,6 +404,18 @@ function jump(player) {
   player.vy = -config.jumpForce;
   player.grounded = false;
   player.jumpFlash = config.jumpFlashLife;
+}
+
+function dash(player) {
+  if (!player) return;
+  if (state.phase !== "playing" || state.paused) return;
+  if (player.dashing || player.dashCooldown > 0) return;
+  player.dashing = true;
+  player.dashOffset = 0;
+  player.dashElapsed = 0;
+  player.dashCooldown = config.dashCooldown;
+  player.dashInvuln = config.dashInvulnerableWindow;
+  player.jumpFlash = Math.max(player.jumpFlash, config.jumpFlashLife * 0.6);
 }
 
 function startRun() {
@@ -389,6 +474,12 @@ function endRun(loser) {
   state.lastLoser = loser?.label ?? null;
   for (const player of players) {
     player.jumpFlash = 0;
+    player.dashing = false;
+    player.dashInvuln = 0;
+    player.dashOffset = 0;
+    player.dashElapsed = 0;
+    player.dashCooldown = 0;
+    player.x = player.baseX;
   }
   setStatusText(getStatusMessage());
   updateControls();
@@ -448,7 +539,8 @@ function setStatusText(message) {
 }
 
 function getStatusMessage() {
-  const controlHelp = "Runner One — Space/W/Click. Runner Two — Arrow Up/L/Numpad8.";
+  const controlHelp =
+    "Runner One — Jump: Space/W/Click, Dash: Shift/Q/D. Runner Two — Jump: Arrow Up/L/Numpad8, Dash: Arrow Right/Shift/O.";
   if (state.phase === "idle") return `Tap Play to begin. ${controlHelp}`;
   if (state.phase === "playing") {
     return state.paused ? "Paused — press Play or P." : controlHelp;
@@ -460,10 +552,16 @@ function getStatusMessage() {
 function placePlayers() {
   const ground = groundLine();
   for (const player of players) {
+    player.x = player.baseX;
     player.y = ground - player.height;
     player.vy = 0;
     player.grounded = true;
     player.jumpFlash = 0;
+    player.dashOffset = 0;
+    player.dashing = false;
+    player.dashElapsed = 0;
+    player.dashCooldown = 0;
+    player.dashInvuln = 0;
   }
 }
 
@@ -504,6 +602,7 @@ function createPlayer({ label, x, bodyColor, accentColor }) {
     label,
     width: 46,
     height: 54,
+    baseX: x,
     x,
     y: 0,
     vy: 0,
@@ -511,11 +610,21 @@ function createPlayer({ label, x, bodyColor, accentColor }) {
     bodyColor,
     accentColor,
     jumpFlash: 0,
+    dashOffset: 0,
+    dashElapsed: 0,
+    dashing: false,
+    dashCooldown: 0,
+    dashInvuln: 0,
   };
 }
 
 function rand(min, max) {
   return Math.random() * (max - min) + min;
+}
+
+function easeOutCubic(value) {
+  const clamped = Math.max(0, Math.min(1, value));
+  return 1 - Math.pow(1 - clamped, 3);
 }
 
 function loadBestScore() {
