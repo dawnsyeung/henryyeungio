@@ -20,6 +20,7 @@ const controls = {
   pause: document.getElementById("pause-btn"),
   reset: document.getElementById("reset-btn"),
 };
+
 const modeButtons = Array.from(document.querySelectorAll("#mode-toggle [data-mode]"));
 
 const BEST_KEY = "skyboundSpringsBest";
@@ -60,30 +61,20 @@ const state = {
 
 const playerPresets = [
   {
-const players = [
-  createPlayer({
     label: "Runner One",
-    x: 160,
+    startX: 160,
     bodyColor: "#fefefe",
     accentColor: "#5ef5ff",
   },
   {
     label: "Runner Two",
-    x: 160,
+    startX: 160,
     bodyColor: "#ffd8f7",
     accentColor: "#ff84d8",
   },
 ];
 
 const players = playerPresets.map((preset) => createPlayer(preset));
-  }),
-  createPlayer({
-    label: "Runner Two",
-    x: 236,
-    bodyColor: "#ffe7fb",
-    accentColor: "#ff84d8",
-  }),
-];
 
 const jumpKeyBindings = new Map([
   ["Space", 0],
@@ -142,18 +133,21 @@ function attachEvents() {
       handleJumpRequest(jumpPlayerIndex);
       return;
     }
+
     const dashPlayerIndex = dashKeyBindings.get(event.code);
     if (dashPlayerIndex !== undefined) {
       event.preventDefault();
       handleDashRequest(dashPlayerIndex);
       return;
     }
+
     if (event.code === "KeyP") {
       event.preventDefault();
       if (state.phase === "playing") {
         state.paused ? resumeRun() : pauseRun();
       }
     }
+
     if (event.code === "KeyR") {
       event.preventDefault();
       startRun();
@@ -188,66 +182,29 @@ function gameLoop(timestamp = 0) {
 }
 
 function update(dt) {
-  const activePlayersList = getActivePlayers();
-  if (activePlayersList.length === 0) return;
-  const laneHeight = getLaneHeight(activePlayersList.length);
-  let aggregateScore = 0;
+  const activePlayers = getActivePlayers();
+  if (!activePlayers.length) return;
+  const laneHeight = getLaneHeight(activePlayers.length);
+
+  let highestScore = 0;
   let aggregateLoadRatio = 0;
 
-  for (const player of activePlayersList) {
+  for (const player of activePlayers) {
     applyMotion(player, dt, laneHeight);
-
-    const difficulty = Math.min(player.score / config.difficultyScoreSpan, config.maxDifficulty);
-    player.currentSpeed = config.baseSpeed + config.speedRamp * difficulty;
-    player.loadRatio = config.maxDifficulty > 0 ? difficulty / config.maxDifficulty : 0;
-    aggregateLoadRatio = Math.max(aggregateLoadRatio, player.loadRatio);
-
-    player.spawnTimer -= dt;
-    if (player.spawnTimer <= 0) {
-      spawnObstacle(player, laneHeight);
-    }
-
-    player.obstacles = player.obstacles.filter((obstacle) => {
-      obstacle.x -= player.currentSpeed * dt;
-      return obstacle.x + obstacle.width > -20;
-    });
-
-    for (const obstacle of player.obstacles) {
-    player.jumpFlash = Math.max(0, player.jumpFlash - dt);
-    player.dashCooldown = Math.max(0, player.dashCooldown - dt);
-    player.dashInvuln = Math.max(0, player.dashInvuln - dt);
+    tickPlayerTimers(player, dt);
     updateDashState(player, dt);
-  }
-
-  const difficulty = Math.min(state.score / config.difficultyScoreSpan, config.maxDifficulty);
-  state.currentSpeed = config.baseSpeed + config.speedRamp * difficulty;
-  state.loadRatio = config.maxDifficulty > 0 ? difficulty / config.maxDifficulty : 0;
-
-  state.spawnTimer -= dt;
-  if (state.spawnTimer <= 0) {
-    spawnObstacle();
-  }
-
-  state.obstacles = state.obstacles.filter((obstacle) => {
-    obstacle.x -= state.currentSpeed * dt;
-    return obstacle.x + obstacle.width > -20;
-  });
-
-  for (const obstacle of state.obstacles) {
-    for (const player of players) {
-      if (player.dashInvuln > 0) continue;
-      if (intersectsPlayer(player, obstacle)) {
-        endRun(player);
-        return;
-      }
+    const collided = updateObstaclesAndCollisions(player, dt, laneHeight);
+    if (collided) {
+      return;
     }
 
     player.score += dt * player.currentSpeed * config.scoreRate;
-    aggregateScore = Math.max(aggregateScore, player.score);
+    highestScore = Math.max(highestScore, player.score);
+    aggregateLoadRatio = Math.max(aggregateLoadRatio, player.loadRatio);
   }
 
-  state.score = aggregateScore;
-  state.currentSpeed = activePlayersList[0]?.currentSpeed ?? config.baseSpeed;
+  state.score = highestScore;
+  state.currentSpeed = activePlayers[0]?.currentSpeed ?? config.baseSpeed;
   state.loadRatio = aggregateLoadRatio;
 
   updateScoreUI();
@@ -267,18 +224,68 @@ function applyMotion(player, dt, laneHeight) {
   } else {
     player.grounded = false;
   }
+}
 
+function tickPlayerTimers(player, dt) {
   player.jumpFlash = Math.max(0, player.jumpFlash - dt);
+  player.dashCooldown = Math.max(0, player.dashCooldown - dt);
+  player.dashInvuln = Math.max(0, player.dashInvuln - dt);
+}
+
+function updateDashState(player, dt) {
+  if (player.dashing) {
+    player.dashElapsed = Math.min(config.dashDuration, player.dashElapsed + dt);
+    const progress = player.dashElapsed / config.dashDuration;
+    const eased = easeOutCubic(progress);
+    player.dashOffset = eased * config.dashDistance;
+    player.x = player.baseX + player.dashOffset;
+    if (player.dashElapsed >= config.dashDuration) {
+      player.dashing = false;
+    }
+  } else if (player.dashOffset > 0) {
+    const retreat = config.dashReturnSpeed * dt;
+    player.dashOffset = Math.max(0, player.dashOffset - retreat);
+    player.x = player.baseX + player.dashOffset;
+  } else {
+    player.x = player.baseX;
+    player.dashElapsed = 0;
+  }
+}
+
+function updateObstaclesAndCollisions(player, dt, laneHeight) {
+  const difficulty = Math.min(player.score / config.difficultyScoreSpan, config.maxDifficulty);
+  player.currentSpeed = config.baseSpeed + config.speedRamp * difficulty;
+  player.loadRatio = config.maxDifficulty > 0 ? difficulty / config.maxDifficulty : 0;
+
+  player.spawnTimer -= dt;
+  if (player.spawnTimer <= 0) {
+    spawnObstacle(player, laneHeight);
+  }
+
+  let collided = false;
+  player.obstacles = player.obstacles.filter((obstacle) => {
+    obstacle.x -= player.currentSpeed * dt;
+    if (!collided && player.dashInvuln <= 0 && intersectsPlayer(player, obstacle)) {
+      collided = true;
+    }
+    return obstacle.x + obstacle.width > -40;
+  });
+
+  if (collided) {
+    endRun(player);
+    return true;
+  }
+  return false;
 }
 
 function draw() {
-  const activePlayersList = getActivePlayers();
-  if (activePlayersList.length === 0) return;
-  const laneHeight = getLaneHeight(activePlayersList.length);
+  const activePlayers = getActivePlayers();
+  if (!activePlayers.length) return;
+  const laneHeight = getLaneHeight(activePlayers.length);
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  activePlayersList.forEach((player, index) => {
+  activePlayers.forEach((player, index) => {
     const offsetY = laneHeight * index;
     ctx.save();
     ctx.beginPath();
@@ -301,6 +308,7 @@ function drawLane(player, laneHeight) {
   drawBackgroundStreaks(player.score, laneHeight);
   drawGround(laneHeight);
   drawObstacles(player);
+  drawDashTrail(player);
   drawPlayer(player);
   drawJumpFlash(player, laneHeight);
 }
@@ -312,15 +320,6 @@ function drawLaneBackground(laneHeight) {
   gradient.addColorStop(1, "#050714");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, laneHeight);
-  ctx.fillRect(0, 0, width, height);
-
-  drawBackgroundStreaks();
-  drawGround();
-  drawObstacles();
-  drawDashTrails();
-  drawPlayers();
-  drawJumpFlash();
-  drawOverlay();
 }
 
 function drawBackgroundStreaks(score = state.score, laneHeight = canvas.height) {
@@ -358,32 +357,27 @@ function drawGround(laneHeight = canvas.height) {
 function drawObstacles(player) {
   for (const obstacle of player.obstacles) {
     drawRoundedRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height, 10, obstacle.color);
+    ctx.save();
     ctx.fillStyle = "rgba(255,255,255,0.12)";
     ctx.fillRect(obstacle.x + 4, obstacle.y + 4, obstacle.width - 8, 2);
+    ctx.restore();
   }
 }
 
-function drawDashTrails() {
+function drawDashTrail(player) {
+  if (!player.dashing && player.dashOffset <= 0) return;
+  const ratio = player.dashing ? 1 : player.dashOffset / config.dashDistance;
+  if (!Number.isFinite(ratio) || ratio <= 0) return;
+  const width = player.width + player.dashOffset + 28;
+  const height = player.height + 24;
+  const x = player.x + player.width - width;
+  const y = player.y - 12;
   ctx.save();
-  for (const player of players) {
-    const ratio = player.dashing ? 1 : player.dashOffset / config.dashDistance;
-    if (!Number.isFinite(ratio) || ratio <= 0) continue;
-    const width = player.width + player.dashOffset + 28;
-    const height = player.height + 24;
-    const x = player.x + player.width - width;
-    const y = player.y - 12;
-    ctx.globalAlpha = 0.08 + ratio * 0.4;
-    ctx.filter = "blur(4px)";
-    ctx.fillStyle = player.accentColor;
-    ctx.fillRect(x, y, width, height);
-  }
+  ctx.globalAlpha = 0.08 + ratio * 0.4;
+  ctx.filter = "blur(4px)";
+  ctx.fillStyle = player.accentColor;
+  ctx.fillRect(x, y, width, height);
   ctx.restore();
-}
-
-function drawPlayers() {
-  for (const player of players) {
-    drawPlayer(player);
-  }
 }
 
 function drawPlayer(player) {
@@ -441,27 +435,6 @@ function drawOverlay() {
 }
 
 function spawnObstacle(player, laneHeight) {
-function updateDashState(player, dt) {
-  if (player.dashing) {
-    player.dashElapsed = Math.min(config.dashDuration, player.dashElapsed + dt);
-    const progress = player.dashElapsed / config.dashDuration;
-    const eased = easeOutCubic(progress);
-    player.dashOffset = eased * config.dashDistance;
-    player.x = player.baseX + player.dashOffset;
-    if (player.dashElapsed >= config.dashDuration) {
-      player.dashing = false;
-    }
-  } else if (player.dashOffset > 0) {
-    const retreat = config.dashReturnSpeed * dt;
-    player.dashOffset = Math.max(0, player.dashOffset - retreat);
-    player.x = player.baseX + player.dashOffset;
-  } else {
-    player.x = player.baseX;
-    player.dashElapsed = 0;
-  }
-}
-
-function spawnObstacle() {
   const height = rand(config.obstacleHeight.min, config.obstacleHeight.max);
   const width = rand(config.obstacleWidth.min, config.obstacleWidth.max);
   const x = canvas.width + width;
@@ -473,8 +446,8 @@ function spawnObstacle() {
 }
 
 function handleJumpRequest(playerIndex = 0) {
-  const activePlayersList = getActivePlayers();
-  const player = activePlayersList[playerIndex] ?? activePlayersList[0];
+  const activePlayers = getActivePlayers();
+  const player = activePlayers[playerIndex] ?? activePlayers[0];
   if (!player) return;
   if (state.phase === "idle" || state.phase === "over") {
     startRun();
@@ -485,7 +458,8 @@ function handleJumpRequest(playerIndex = 0) {
 }
 
 function handleDashRequest(playerIndex = 0) {
-  const player = players[playerIndex];
+  const activePlayers = getActivePlayers();
+  const player = activePlayers[playerIndex] ?? activePlayers[0];
   if (!player) return;
   if (state.phase === "idle" || state.phase === "over") {
     startRun();
@@ -523,7 +497,7 @@ function startRun() {
   state.currentSpeed = config.baseSpeed;
   state.loadRatio = 0;
   state.lastLoser = null;
-  placePlayers();
+  resetPlayersForMode();
   updateScoreUI();
   updateSpeedReadout();
   updateLoadBar(0);
@@ -539,7 +513,6 @@ function resetToIdle(message) {
   state.loadRatio = 0;
   state.lastLoser = null;
   resetPlayersForMode(config.spawnBase);
-  placePlayers();
   updateScoreUI();
   updateSpeedReadout();
   updateLoadBar(0);
@@ -620,6 +593,8 @@ function updateControls() {
     let label = "Play";
     if (state.phase === "playing") {
       label = state.paused ? "Resume" : "Restart";
+    } else if (state.phase === "over") {
+      label = "Play Again";
     }
     controls.play.textContent = label;
   }
@@ -646,10 +621,8 @@ function updateModeButtons() {
 function getStatusMessage() {
   const controlHelp =
     state.mode === "duo"
-      ? "P1: Space or click • P2: Arrow Up or Numpad 8."
-      : "Jump with Space, click, or Arrow Up.";
-  const controlHelp = "Runner One — Space/W/Click. Runner Two — Arrow Up/L/Numpad8.";
-    "Runner One — Jump: Space/W/Click, Dash: Shift/Q/D. Runner Two — Jump: Arrow Up/L/Numpad8, Dash: Arrow Right/Shift/O.";
+      ? "Runner One — Space/W/Click. Runner Two — Arrow Up/L/Numpad8."
+      : "Jump with Space, W, click, or Arrow Up.";
   if (state.phase === "idle") return `Tap Play to begin. ${controlHelp}`;
   if (state.phase === "playing") {
     return state.paused ? "Paused — press Play or P." : controlHelp;
@@ -659,23 +632,10 @@ function getStatusMessage() {
 }
 
 function resetPlayersForMode(initialSpawn = config.spawnBase) {
-  const laneHeight = getLaneHeight(state.mode === "duo" ? 2 : 1);
   for (const player of players) {
     resetPlayerLane(player, initialSpawn);
-    player.x = player.startX;
-    player.y = groundLine(laneHeight) - player.height;
-    player.grounded = true;
-    player.x = player.baseX;
-    player.y = ground - player.height;
-    player.vy = 0;
-    player.grounded = true;
-    player.jumpFlash = 0;
-    player.dashOffset = 0;
-    player.dashing = false;
-    player.dashElapsed = 0;
-    player.dashCooldown = 0;
-    player.dashInvuln = 0;
   }
+  placePlayers();
 }
 
 function resetPlayerLane(player, initialSpawn = config.spawnBase) {
@@ -686,6 +646,23 @@ function resetPlayerLane(player, initialSpawn = config.spawnBase) {
   player.loadRatio = 0;
   player.jumpFlash = 0;
   player.vy = 0;
+  player.grounded = true;
+  player.dashOffset = 0;
+  player.dashElapsed = 0;
+  player.dashing = false;
+  player.dashCooldown = 0;
+  player.dashInvuln = 0;
+  player.baseX = player.startX;
+  player.x = player.baseX;
+}
+
+function placePlayers() {
+  const activeCount = state.mode === "duo" ? 2 : 1;
+  const laneHeight = getLaneHeight(activeCount);
+  const ground = groundLine(laneHeight);
+  for (const player of players) {
+    player.y = ground - player.height;
+  }
 }
 
 function getActivePlayers() {
@@ -739,14 +716,14 @@ function intersectsPlayer(player, obstacle) {
   );
 }
 
-function createPlayer({ label, x, bodyColor, accentColor }) {
+function createPlayer({ label, startX, bodyColor, accentColor }) {
   return {
     label,
-    startX: x,
+    startX,
     width: 46,
     height: 54,
-    baseX: x,
-    x,
+    baseX: startX,
+    x: startX,
     y: 0,
     vy: 0,
     grounded: true,
