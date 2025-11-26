@@ -55,6 +55,8 @@ const state = {
 
 const playerPresets = [
   {
+const players = [
+  createPlayer({
     label: "Runner One",
     x: 160,
     bodyColor: "#fefefe",
@@ -69,6 +71,22 @@ const playerPresets = [
 ];
 
 const players = playerPresets.map((preset) => createPlayer(preset));
+  }),
+  createPlayer({
+    label: "Runner Two",
+    x: 236,
+    bodyColor: "#ffe7fb",
+    accentColor: "#ff84d8",
+  }),
+];
+
+const jumpKeyBindings = new Map([
+  ["Space", 0],
+  ["KeyW", 0],
+  ["ArrowUp", 1],
+  ["KeyL", 1],
+  ["Numpad8", 1],
+]);
 
 init();
 
@@ -104,15 +122,10 @@ function attachEvents() {
 
   window.addEventListener("keydown", (event) => {
     if (event.repeat) return;
-    if (event.code === "Space" || event.code === "KeyW") {
+    const jumpPlayerIndex = jumpKeyBindings.get(event.code);
+    if (jumpPlayerIndex !== undefined) {
       event.preventDefault();
-      handleJumpRequest(0);
-      return;
-    }
-    if (event.code === "ArrowUp" || event.code === "Numpad8") {
-      event.preventDefault();
-      const targetIndex = state.mode === "duo" ? 1 : 0;
-      handleJumpRequest(targetIndex);
+      handleJumpRequest(jumpPlayerIndex);
       return;
     }
     if (event.code === "KeyP") {
@@ -391,7 +404,7 @@ function startRun() {
   state.currentSpeed = config.baseSpeed;
   state.loadRatio = 0;
   state.lastLoser = null;
-  resetPlayersForMode(0.8);
+  placePlayers();
   updateScoreUI();
   updateSpeedReadout();
   updateLoadBar(0);
@@ -407,6 +420,7 @@ function resetToIdle(message) {
   state.loadRatio = 0;
   state.lastLoser = null;
   resetPlayersForMode(config.spawnBase);
+  placePlayers();
   updateScoreUI();
   updateSpeedReadout();
   updateLoadBar(0);
@@ -509,6 +523,7 @@ function getStatusMessage() {
     state.mode === "duo"
       ? "P1: Space or click • P2: Arrow Up or Numpad 8."
       : "Jump with Space, click, or Arrow Up.";
+  const controlHelp = "Runner One — Space/W/Click. Runner Two — Arrow Up/L/Numpad8.";
   if (state.phase === "idle") return `Tap Play to begin. ${controlHelp}`;
   if (state.phase === "playing") {
     return state.paused ? "Paused — press Play or P." : controlHelp;
