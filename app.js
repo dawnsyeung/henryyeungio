@@ -264,9 +264,16 @@ function loop(timestamp = 0) {
 function update(dt) {
   if (state.betweenRounds > 0) {
     state.betweenRounds = Math.max(0, state.betweenRounds - dt);
-  } else {
-    state.timeLeft = Math.max(0, state.timeLeft - dt);
+    // Freeze fighters between rounds so no one gets "free" hits before the next start.
+    p1.vx = 0;
+    p1.vy = 0;
+    p2.vx = 0;
+    p2.vy = 0;
+    updateUI();
+    return;
   }
+
+  state.timeLeft = Math.max(0, state.timeLeft - dt);
 
   // Face each other
   p1.facing = p2.x >= p1.x ? 1 : -1;
@@ -432,9 +439,6 @@ function resolveAttack(attacker, defender) {
 function endRound() {
   if (state.phase !== "playing") return;
 
-  state.phase = "over";
-  state.paused = true;
-
   const p1Alive = p1.health > 0;
   const p2Alive = p2.health > 0;
 
@@ -450,10 +454,23 @@ function endRound() {
 
   if (winner === "p1") {
     addCoins(WIN_COIN_REWARD);
-    setStatus(`${state.winnerText} +${WIN_COIN_REWARD} coins (Total: ${state.coins}). Press Play (or R) to restart.`);
+    setStatus(
+      `${state.winnerText} +${WIN_COIN_REWARD} coins (Total: ${state.coins}). Next round starting...`,
+    );
   } else {
-    setStatus(`${state.winnerText} Press Play (or R) to restart.`);
+    setStatus(`${state.winnerText} Next round starting...`);
   }
+
+  // Infinite mode: immediately queue up the next round.
+  state.round += 1;
+  state.timeLeft = config.round.timeSeconds;
+  state.betweenRounds = config.round.betweenRoundsDelay;
+  state.winnerText = "";
+  state.meter = 0;
+
+  resetFighter(p1, canvas.width * 0.32, 1);
+  resetFighter(p2, canvas.width * 0.68, -1);
+
   updateControls();
   updateUI();
 }
@@ -465,7 +482,7 @@ function start() {
   state.winnerText = "";
   state.betweenRounds = 0;
   state.meter = 0;
-  state.round = Math.max(1, state.round);
+  state.round = 1;
 
   resetFighter(p1, canvas.width * 0.32, 1);
   resetFighter(p2, canvas.width * 0.68, -1);
