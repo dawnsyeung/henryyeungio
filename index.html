@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Starwatch Expedition — Bird's Eye Adventure</title>
+    <title>Stickman Battle — Canvas Fighter</title>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap"
@@ -15,12 +15,11 @@
     <div class="game-shell">
       <header class="panel hero">
         <div class="hero-copy">
-          <p class="eyebrow">Prototype Build • Top-Down Exploration</p>
-          <h1>Starwatch Expedition</h1>
+          <p class="eyebrow">Prototype Build • 1v1 Stick Fighter</p>
+          <h1>Stickman Battle</h1>
           <p>
-            Pilot a ranger squad from a floating command console and guide a single scout through the ruins below. Glide across mossy
-            courtyards, snag radiant artifacts, and weave around clockwork sentries that patrol on looping routes. Every decision happens
-            from a bird's-eye view, so read the whole map before you commit to a sprint.
+            A quick, clean 2D stickman fighting game on a single canvas. Trade punches and kicks, block to reduce damage, and knock your
+            opponent out before the timer hits zero.
           </p>
           <div class="hero-actions">
             <button id="play-btn" type="button" class="primary">Play</button>
@@ -30,38 +29,38 @@
         </div>
         <div class="stats">
           <div class="stat">
-            <p class="label">Artifacts</p>
-            <p id="score-value" class="value">0</p>
+            <p class="label">Player 1</p>
+            <p id="p1-health-value" class="value">100</p>
           </div>
           <div class="stat">
-            <p class="label">Best</p>
-            <p id="best-value" class="value">0</p>
+            <p class="label">Player 2</p>
+            <p id="p2-health-value" class="value">100</p>
           </div>
           <div class="stat">
-            <p class="label">Threat Level</p>
-            <p id="speed-value" class="value gun-name">Calm</p>
+            <p class="label">Round</p>
+            <p id="round-value" class="value gun-name">1</p>
           </div>
           <div class="stat">
-            <p class="label">Objective</p>
-            <p id="objective-value" class="value value-sm">Standby</p>
+            <p class="label">Timer</p>
+            <p id="timer-value" class="value value-sm">60</p>
           </div>
         </div>
 
         <div class="loadup">
           <div class="loadup-head">
-            <p class="label">Pulse Cooldown</p>
-            <p id="load-text" class="load-text">Ready</p>
+            <p class="label">Special Meter</p>
+            <p id="meter-text" class="load-text">0%</p>
           </div>
           <div
-            id="load-track"
+            id="meter-track"
             class="load-track"
             role="progressbar"
-            aria-label="Speed load progress"
+            aria-label="Special meter progress"
             aria-valuemin="0"
             aria-valuemax="100"
-            aria-valuenow="100"
+            aria-valuenow="0"
           >
-            <div id="load-fill" class="load-fill" style="width: 100%"></div>
+            <div id="meter-fill" class="load-fill" style="width: 0%"></div>
           </div>
         </div>
       </header>
@@ -69,49 +68,48 @@
       <main class="panel playfield">
         <div class="canvas-headline">
           <div>
-            <h2>Recon Grid</h2>
-          <p>Collect skyshards, avoid sentries, and reach the evac flare without losing visual contact.</p>
+            <h2>Arena</h2>
+            <p>Local 2-player stick fighting. First to 0 HP loses the round.</p>
           </div>
           <div class="hotkeys">
-          <p>Move with <span class="key">WASD</span> or <span class="key">Arrows</span></p>
-          <p>Hold <span class="key">Shift</span> to sprint</p>
-          <p>Trigger <span class="key">Space</span> to pulse and stun sentries</p>
-          <p><span class="key">P</span> pause / resume</p>
-          <p><span class="key">R</span> restart</p>
+            <p><strong>P1</strong>: <span class="key">A</span><span class="key">D</span> move, <span class="key">W</span> jump</p>
+            <p><strong>P1</strong>: <span class="key">F</span> punch, <span class="key">G</span> kick, <span class="key">S</span> block</p>
+            <p><strong>P2</strong>: <span class="key">←</span><span class="key">→</span> move, <span class="key">↑</span> jump</p>
+            <p><strong>P2</strong>: <span class="key">/</span> punch, <span class="key">.</span> kick, <span class="key">↓</span> block</p>
+            <p><span class="key">P</span> pause / resume • <span class="key">R</span> restart</p>
             <p>
-              Sentries switch to a chase state if you cross their field of view. Sprint to break line of sight, or pop an echo pulse to freeze them temporarily.
+              Blocking reduces damage but doesn’t stop knockback completely. Land hits to build Special Meter.
             </p>
           </div>
           <div class="hotkeys">
             <div class="hotkey-card">
-              <p class="label">Move</p>
+              <p class="label">P1 Move</p>
               <p>
-                <span class="key">W</span>
                 <span class="key">A</span>
-                <span class="key">S</span>
                 <span class="key">D</span>
+                <span class="key">W</span>
               </p>
             </div>
             <div class="hotkey-card">
-              <p class="label">Alternate Move</p>
+              <p class="label">P2 Move</p>
               <p>
-                <span class="key">Arrow&nbsp;Up</span>
-                <span class="key">Arrow&nbsp;Left</span>
-                <span class="key">Arrow&nbsp;Down</span>
-                <span class="key">Arrow&nbsp;Right</span>
+                <span class="key">←</span>
+                <span class="key">→</span>
+                <span class="key">↑</span>
               </p>
             </div>
             <div class="hotkey-card">
-              <p class="label">Sprint</p>
+              <p class="label">P1 Attacks</p>
               <p>
-                <span class="key">L&nbsp;Shift</span>
-                <span class="key">R&nbsp;Shift</span>
+                <span class="key">F</span>
+                <span class="key">G</span>
               </p>
             </div>
             <div class="hotkey-card">
-              <p class="label">Echo Pulse</p>
+              <p class="label">P2 Attacks</p>
               <p>
-                <span class="key">Space</span>
+                <span class="key">/</span>
+                <span class="key">.</span>
               </p>
             </div>
             <div class="hotkey-card">
@@ -119,7 +117,7 @@
               <p><span class="key">P</span></p>
             </div>
             <div class="hotkey-card">
-              <p class="label">Reset Mission</p>
+              <p class="label">Restart</p>
               <p><span class="key">R</span></p>
             </div>
           </div>
@@ -128,7 +126,7 @@
           id="expedition-canvas"
           width="960"
           height="540"
-          aria-label="Top-down ruins exploration game"
+          aria-label="Stickman battle fighting game"
         ></canvas>
         <p id="status-text" class="status-text">Tap Play to begin.</p>
       </main>
