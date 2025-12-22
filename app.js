@@ -14,6 +14,22 @@ const ui = {
   meterTrack: document.getElementById("meter-track"),
   meterFill: document.getElementById("meter-fill"),
   meterText: document.getElementById("meter-text"),
+  homeScreen: document.getElementById("home-screen"),
+  nextBattle: document.getElementById("next-battle-btn"),
+  p1Coins: document.getElementById("p1-coins-value"),
+  p2Coins: document.getElementById("p2-coins-value"),
+  p1WeaponLevel: document.getElementById("p1-weapon-level"),
+  p1ArmorLevel: document.getElementById("p1-armor-level"),
+  p2WeaponLevel: document.getElementById("p2-weapon-level"),
+  p2ArmorLevel: document.getElementById("p2-armor-level"),
+  p1WeaponCost: document.getElementById("p1-weapon-cost"),
+  p1ArmorCost: document.getElementById("p1-armor-cost"),
+  p2WeaponCost: document.getElementById("p2-weapon-cost"),
+  p2ArmorCost: document.getElementById("p2-armor-cost"),
+  p1UpgradeWeapon: document.getElementById("p1-upgrade-weapon"),
+  p1UpgradeArmor: document.getElementById("p1-upgrade-armor"),
+  p2UpgradeWeapon: document.getElementById("p2-upgrade-weapon"),
+  p2UpgradeArmor: document.getElementById("p2-upgrade-armor"),
 };
 
 const controls = {
@@ -90,7 +106,7 @@ const input = {
 };
 
 const state = {
-  phase: "idle", // idle | playing | over
+  phase: "home", // home | playing
   paused: true,
   round: 1,
   timeLeft: config.round.timeSeconds,
@@ -98,6 +114,14 @@ const state = {
   lastTime: performance.now(),
   betweenRounds: 0,
   meter: 0, // 0..1 (shared "special meter" just for UI flair)
+};
+
+const economy = {
+  weaponCostBase: 40,
+  armorCostBase: 35,
+  weaponDamagePerLevel: 0.08, // +8% per level
+  armorHealthPerLevel: 8, // +8 max HP per level
+  maxUpgradeLevel: 30,
 };
 
 const arena = {
@@ -128,14 +152,14 @@ init();
 
 function init() {
   attachEvents();
-  resetToIdle();
+  resetToHome(true);
   requestAnimationFrame(loop);
 }
 
 function attachEvents() {
   controls.play?.addEventListener("click", () => {
     if (state.phase === "playing" && state.paused) resume();
-    else start();
+    else startBattle({ restart: state.phase === "playing" });
   });
 
   controls.pause?.addEventListener("click", () => {
@@ -144,13 +168,22 @@ function attachEvents() {
   });
 
   controls.reset?.addEventListener("click", () => {
-    resetToIdle();
+    resetToHome(true);
   });
 
   canvas.addEventListener("pointerdown", () => {
     if (state.phase === "playing" && state.paused) resume();
-    else if (state.phase !== "playing") start();
+    else if (state.phase !== "playing") startBattle({ restart: false });
   });
+
+  ui.nextBattle?.addEventListener("click", () => {
+    startBattle({ restart: false });
+  });
+
+  ui.p1UpgradeWeapon?.addEventListener("click", () => buyUpgrade(p1, "weapon"));
+  ui.p1UpgradeArmor?.addEventListener("click", () => buyUpgrade(p1, "armor"));
+  ui.p2UpgradeWeapon?.addEventListener("click", () => buyUpgrade(p2, "weapon"));
+  ui.p2UpgradeArmor?.addEventListener("click", () => buyUpgrade(p2, "armor"));
 
   window.addEventListener("keydown", (event) => {
     if (event.repeat) return;
@@ -163,7 +196,7 @@ function attachEvents() {
     }
     if (event.code === "KeyR") {
       event.preventDefault();
-      start();
+      startBattle({ restart: state.phase === "playing" });
       return;
     }
 
@@ -385,7 +418,7 @@ function resolveAttack(attacker, defender) {
 
   // Block only works when the attacker is in front of the defender (i.e. in the defender's facing direction).
   const blocked = defender.blocking && Math.sign(attacker.x - defender.x) === defender.facing;
-  const damage = blocked ? Math.ceil(def.damage * config.fighter.blockDamageMultiplier) : def.damage;
+  const damage = computeDamage(attacker, def.damage, blocked);
 
   defender.health = Math.max(0, defender.health - damage);
   defender.hitstun = def.hitstun * (blocked ? 0.65 : 1);
@@ -403,7 +436,6 @@ function resolveAttack(attacker, defender) {
 function endRound() {
   if (state.phase !== "playing") return;
 
-  state.phase = "over";
   state.paused = true;
 
   const p1Alive = p1.health > 0;
@@ -414,12 +446,12 @@ function endRound() {
   else if (p1.health === p2.health) state.winnerText = "Draw!";
   else state.winnerText = p1.health > p2.health ? "Player 1 wins!" : "Player 2 wins!";
 
-  setStatus(`${state.winnerText} Press Play (or R) to restart.`);
-  updateControls();
-  updateUI();
+  awardCoinsForBattle();
+  state.round += 1;
+  enterHome(`${state.winnerText} Armory time — upgrade both players.`);
 }
 
-function start() {
+function startBattle({ restart }) {
   state.phase = "playing";
   state.paused = false;
   state.timeLeft = config.round.timeSeconds;
@@ -428,27 +460,31 @@ function start() {
   state.meter = 0;
   state.round = Math.max(1, state.round);
 
-  resetFighter(p1, canvas.width * 0.32, 1);
-  resetFighter(p2, canvas.width * 0.68, -1);
+  resetFighterForBattle(p1, canvas.width * 0.32, 1);
+  resetFighterForBattle(p2, canvas.width * 0.68, -1);
 
-  setStatus("Fight!");
+  setStatus(restart ? "Restart!" : "Fight!");
   updateControls();
   updateUI();
 }
 
-function resetToIdle() {
-  state.phase = "idle";
+function resetToHome(fullReset) {
+  if (fullReset) {
+    state.round = 1;
+    resetProgress(p1);
+    resetProgress(p2);
+  }
+
+  state.phase = "home";
   state.paused = true;
-  state.round = 1;
   state.timeLeft = config.round.timeSeconds;
   state.winnerText = "";
   state.betweenRounds = 0;
   state.meter = 0;
 
-  resetFighter(p1, canvas.width * 0.32, 1);
-  resetFighter(p2, canvas.width * 0.68, -1);
+  placeFightersInHome();
 
-  setStatus("Tap Play to begin.");
+  setStatus("Armory ready — upgrade both players, then start the battle.");
   updateControls();
   updateUI();
 }
@@ -475,7 +511,7 @@ function updateControls() {
   if (controls.play) {
     let label = "Play";
     if (state.phase === "playing") label = state.paused ? "Resume" : "Restart";
-    if (state.phase === "over") label = "Play Again";
+    if (state.phase === "home") label = state.round === 1 ? "Start Battle" : "Next Battle";
     controls.play.textContent = label;
   }
 }
@@ -492,6 +528,32 @@ function updateUI() {
     ui.meterTrack.setAttribute("aria-valuenow", String(percent));
     ui.meterText.textContent = `${percent}%`;
   }
+
+  const inHome = state.phase === "home";
+  if (ui.homeScreen) ui.homeScreen.hidden = !inHome;
+
+  if (ui.p1Coins) ui.p1Coins.textContent = String(p1.coins);
+  if (ui.p2Coins) ui.p2Coins.textContent = String(p2.coins);
+
+  if (ui.p1WeaponLevel) ui.p1WeaponLevel.textContent = `Lv ${p1.weaponLevel}`;
+  if (ui.p1ArmorLevel) ui.p1ArmorLevel.textContent = `Lv ${p1.armorLevel}`;
+  if (ui.p2WeaponLevel) ui.p2WeaponLevel.textContent = `Lv ${p2.weaponLevel}`;
+  if (ui.p2ArmorLevel) ui.p2ArmorLevel.textContent = `Lv ${p2.armorLevel}`;
+
+  const p1WCost = getUpgradeCost(p1, "weapon");
+  const p1ACost = getUpgradeCost(p1, "armor");
+  const p2WCost = getUpgradeCost(p2, "weapon");
+  const p2ACost = getUpgradeCost(p2, "armor");
+
+  if (ui.p1WeaponCost) ui.p1WeaponCost.textContent = String(p1WCost);
+  if (ui.p1ArmorCost) ui.p1ArmorCost.textContent = String(p1ACost);
+  if (ui.p2WeaponCost) ui.p2WeaponCost.textContent = String(p2WCost);
+  if (ui.p2ArmorCost) ui.p2ArmorCost.textContent = String(p2ACost);
+
+  if (ui.p1UpgradeWeapon) ui.p1UpgradeWeapon.disabled = !canBuyUpgrade(p1, "weapon");
+  if (ui.p1UpgradeArmor) ui.p1UpgradeArmor.disabled = !canBuyUpgrade(p1, "armor");
+  if (ui.p2UpgradeWeapon) ui.p2UpgradeWeapon.disabled = !canBuyUpgrade(p2, "weapon");
+  if (ui.p2UpgradeArmor) ui.p2UpgradeArmor.disabled = !canBuyUpgrade(p2, "armor");
 }
 
 function setStatus(message) {
@@ -501,16 +563,18 @@ function setStatus(message) {
 function draw() {
   drawBackground();
   drawFloor();
-  drawHUDOverlay();
+  if (state.phase === "playing") drawHUDOverlay();
+  else drawHomeOverlay();
   drawFighter(p1);
   drawFighter(p2);
   drawCenterPrompt();
 }
 
 function drawBackground() {
+  const isHome = state.phase === "home";
   const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  g.addColorStop(0, config.visuals.bgTop);
-  g.addColorStop(1, config.visuals.bgBottom);
+  g.addColorStop(0, isHome ? "#140b1f" : config.visuals.bgTop);
+  g.addColorStop(1, isHome ? "#070917" : config.visuals.bgBottom);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -546,6 +610,37 @@ function drawFloor() {
   ctx.restore();
 }
 
+function drawHomeOverlay() {
+  // soft spotlight and "shop" stage hints
+  ctx.save();
+  ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const glow = ctx.createRadialGradient(canvas.width / 2, arena.floorY - 120, 40, canvas.width / 2, arena.floorY - 120, 420);
+  glow.addColorStop(0, "rgba(255, 122, 230, 0.14)");
+  glow.addColorStop(0.55, "rgba(94, 245, 255, 0.08)");
+  glow.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // pedestals
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  roundRect(canvas.width * 0.22 - 120, arena.floorY - 14, 240, 18, 999);
+  ctx.fill();
+  roundRect(canvas.width * 0.78 - 120, arena.floorY - 14, 240, 18, 999);
+  ctx.fill();
+
+  // header text
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.font = "700 24px Montserrat, system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("ARMORY", canvas.width / 2, 46);
+  ctx.fillStyle = "rgba(255,255,255,0.72)";
+  ctx.font = "600 14px Montserrat, system-ui, sans-serif";
+  ctx.fillText(state.winnerText ? `${state.winnerText}  •  Spend coins to upgrade` : "Spend coins to upgrade", canvas.width / 2, 70);
+  ctx.restore();
+}
+
 function drawHUDOverlay() {
   // Health bars (simple, on-canvas)
   const pad = 26;
@@ -553,8 +648,8 @@ function drawHUDOverlay() {
   const barH = 14;
   const top = 22;
 
-  drawBar(pad, top, barW, barH, p1.health / config.fighter.maxHealth, config.visuals.p1, "P1");
-  drawBar(canvas.width - pad - barW, top, barW, barH, p2.health / config.fighter.maxHealth, config.visuals.p2, "P2");
+  drawBar(pad, top, barW, barH, p1.health / Math.max(1, p1.maxHealth), config.visuals.p1, "P1");
+  drawBar(canvas.width - pad - barW, top, barW, barH, p2.health / Math.max(1, p2.maxHealth), config.visuals.p2, "P2");
 
   // Timer
   ctx.save();
@@ -677,20 +772,7 @@ function drawFighter(f) {
 }
 
 function drawCenterPrompt() {
-  if (state.phase === "idle") return;
-  if (state.phase !== "over") return;
-
-  ctx.save();
-  ctx.fillStyle = "rgba(2, 8, 16, 0.72)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#ffffff";
-  ctx.textAlign = "center";
-  ctx.font = "700 38px Montserrat, system-ui, sans-serif";
-  ctx.fillText(state.winnerText || "Round over", canvas.width / 2, canvas.height / 2 - 10);
-  ctx.fillStyle = config.visuals.muted;
-  ctx.font = "600 16px Montserrat, system-ui, sans-serif";
-  ctx.fillText("Press Play (or R) to restart", canvas.width / 2, canvas.height / 2 + 26);
-  ctx.restore();
+  // Armory replaces the old "round over" overlay.
 }
 
 function createFighter({ id, color, x, y, facing, controls }) {
@@ -702,12 +784,16 @@ function createFighter({ id, color, x, y, facing, controls }) {
     vx: 0,
     vy: 0,
     facing,
+    maxHealth: config.fighter.maxHealth,
     health: config.fighter.maxHealth,
     dead: false,
     hitstun: 0,
     invuln: 0,
     blocking: false,
     jumpsLeft: 1,
+    coins: 0,
+    weaponLevel: 0,
+    armorLevel: 0,
     controls,
     prevControls: { ...controls },
     attack: {
@@ -720,13 +806,14 @@ function createFighter({ id, color, x, y, facing, controls }) {
   };
 }
 
-function resetFighter(f, x, facing) {
+function resetFighterForBattle(f, x, facing) {
   f.x = x;
   f.y = arena.floorY;
   f.vx = 0;
   f.vy = 0;
   f.facing = facing;
-  f.health = config.fighter.maxHealth;
+  f.maxHealth = getFighterMaxHealth(f);
+  f.health = f.maxHealth;
   f.dead = false;
   f.hitstun = 0;
   f.invuln = 0;
@@ -738,6 +825,126 @@ function resetFighter(f, x, facing) {
   f.attack.phase = "none";
   f.attack.hasHit = false;
   f.prevControls = { ...f.controls };
+}
+
+function resetProgress(f) {
+  f.coins = 0;
+  f.weaponLevel = 0;
+  f.armorLevel = 0;
+  f.maxHealth = config.fighter.maxHealth;
+  f.health = f.maxHealth;
+}
+
+function enterHome(message) {
+  state.phase = "home";
+  state.paused = true;
+  state.timeLeft = config.round.timeSeconds;
+  state.betweenRounds = 0;
+
+  placeFightersInHome();
+  setStatus(message);
+  updateControls();
+  updateUI();
+}
+
+function placeFightersInHome() {
+  // Put both players in a "home/armory" spot on the canvas.
+  const leftSpot = canvas.width * 0.22;
+  const rightSpot = canvas.width * 0.78;
+
+  p1.x = leftSpot;
+  p1.y = arena.floorY;
+  p1.vx = 0;
+  p1.vy = 0;
+  p1.facing = 1;
+  p1.hitstun = 0;
+  p1.invuln = 0;
+  p1.blocking = false;
+  p1.attack.def = null;
+  p1.attack.timer = 0;
+  p1.attack.phase = "none";
+  p1.attack.hasHit = false;
+
+  p2.x = rightSpot;
+  p2.y = arena.floorY;
+  p2.vx = 0;
+  p2.vy = 0;
+  p2.facing = -1;
+  p2.hitstun = 0;
+  p2.invuln = 0;
+  p2.blocking = false;
+  p2.attack.def = null;
+  p2.attack.timer = 0;
+  p2.attack.phase = "none";
+  p2.attack.hasHit = false;
+}
+
+function getUpgradeCost(f, type) {
+  const level = type === "weapon" ? f.weaponLevel : f.armorLevel;
+  const base = type === "weapon" ? economy.weaponCostBase : economy.armorCostBase;
+  const nextLevel = level + 1;
+  return base * nextLevel;
+}
+
+function canBuyUpgrade(f, type) {
+  const level = type === "weapon" ? f.weaponLevel : f.armorLevel;
+  if (level >= economy.maxUpgradeLevel) return false;
+  return f.coins >= getUpgradeCost(f, type);
+}
+
+function buyUpgrade(f, type) {
+  if (state.phase !== "home") return;
+  if (!canBuyUpgrade(f, type)) return;
+  const cost = getUpgradeCost(f, type);
+  f.coins -= cost;
+  if (type === "weapon") f.weaponLevel += 1;
+  else f.armorLevel += 1;
+  f.maxHealth = getFighterMaxHealth(f);
+  updateUI();
+}
+
+function getFighterDamageMultiplier(f) {
+  return 1 + f.weaponLevel * economy.weaponDamagePerLevel;
+}
+
+function getFighterMaxHealth(f) {
+  return config.fighter.maxHealth + f.armorLevel * economy.armorHealthPerLevel;
+}
+
+function computeDamage(attacker, baseDamage, blocked) {
+  const weaponMult = getFighterDamageMultiplier(attacker);
+  const raw = baseDamage * weaponMult;
+  const afterBlock = blocked ? raw * config.fighter.blockDamageMultiplier : raw;
+  return Math.max(1, Math.ceil(afterBlock));
+}
+
+function awardCoinsForBattle() {
+  const p1Win = p1.health > p2.health;
+  const p2Win = p2.health > p1.health;
+  const draw = !p1Win && !p2Win;
+
+  // Round-based payouts with a small performance bonus.
+  const r = Math.max(1, state.round);
+  const baseWin = 25 + r * 5;
+  const baseLose = 15 + r * 3;
+  const baseDraw = 20 + r * 4;
+
+  const p1Bonus = Math.floor(Math.max(0, p1.health) * 0.12);
+  const p2Bonus = Math.floor(Math.max(0, p2.health) * 0.12);
+
+  if (draw) {
+    p1.coins += baseDraw + p1Bonus;
+    p2.coins += baseDraw + p2Bonus;
+    return;
+  }
+
+  if (p1Win) {
+    p1.coins += baseWin + p1Bonus;
+    p2.coins += baseLose + p2Bonus;
+  } else {
+    p2.coins += baseWin + p2Bonus;
+    p1.coins += baseLose + p1Bonus;
+  }
 }
 
 function getHurtbox(f) {

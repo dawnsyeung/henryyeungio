@@ -129,6 +129,52 @@
           aria-label="Stickman battle fighting game"
         ></canvas>
         <p id="status-text" class="status-text">Tap Play to begin.</p>
+
+        <section id="home-screen" class="home-screen" aria-label="Home upgrade screen" hidden>
+          <div class="home-head">
+            <div>
+              <h3 class="home-title">Armory</h3>
+              <p class="home-subtitle">Spend coins to upgrade weapons &amp; armor. Then start the next battle.</p>
+            </div>
+            <button id="next-battle-btn" type="button" class="primary">Start Next Battle</button>
+          </div>
+
+          <div class="shop-grid">
+            <div class="shop-card shop-p1">
+              <div class="shop-card-head">
+                <p class="label">Player 1</p>
+                <p class="coin-row"><span class="coin-label">Coins</span> <span id="p1-coins-value" class="coin-value">0</span></p>
+              </div>
+
+              <div class="shop-stats">
+                <p><span class="shop-key">Weapon</span> <span id="p1-weapon-level" class="shop-val">Lv 0</span></p>
+                <p><span class="shop-key">Armor</span> <span id="p1-armor-level" class="shop-val">Lv 0</span></p>
+              </div>
+
+              <div class="shop-actions">
+                <button id="p1-upgrade-weapon" type="button">Upgrade Weapon (<span id="p1-weapon-cost">0</span>)</button>
+                <button id="p1-upgrade-armor" type="button">Upgrade Armor (<span id="p1-armor-cost">0</span>)</button>
+              </div>
+            </div>
+
+            <div class="shop-card shop-p2">
+              <div class="shop-card-head">
+                <p class="label">Player 2</p>
+                <p class="coin-row"><span class="coin-label">Coins</span> <span id="p2-coins-value" class="coin-value">0</span></p>
+              </div>
+
+              <div class="shop-stats">
+                <p><span class="shop-key">Weapon</span> <span id="p2-weapon-level" class="shop-val">Lv 0</span></p>
+                <p><span class="shop-key">Armor</span> <span id="p2-armor-level" class="shop-val">Lv 0</span></p>
+              </div>
+
+              <div class="shop-actions">
+                <button id="p2-upgrade-weapon" type="button">Upgrade Weapon (<span id="p2-weapon-cost">0</span>)</button>
+                <button id="p2-upgrade-armor" type="button">Upgrade Armor (<span id="p2-armor-cost">0</span>)</button>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
 
