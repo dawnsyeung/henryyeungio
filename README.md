@@ -1,6 +1,6 @@
-# Starwatch Expedition — Top-Down Adventure
+# Stickman Battle — Canvas Fighter
 
-Starwatch Expedition is a self-contained browser adventure that plays out from a tactical bird's-eye view. Glide a scout through mossy ruins, collect radiant skyshards, dodge clockwork sentries, and sprint to the evac flare once every artifact is secured. The entire experience runs on a single `<canvas>` with no external dependencies.
+Stickman Battle is a self-contained 2D fighting game built on a single `<canvas>` with no external dependencies. Two players share one keyboard and battle with punches, kicks, jumps, and blocks until someone’s HP hits zero (or the timer runs out).
 
 ## Getting Started
 
@@ -8,18 +8,32 @@ Starwatch Expedition is a self-contained browser adventure that plays out from a
    ```bash
    python -m http.server 4173
    ```
-2. Hit **Play** (or tap the canvas) to deploy the scout.
-3. Use **WASD / Arrow Keys** to move, **Shift** to sprint, **Space** (or a pointer tap) to emit an echo pulse that stuns sentries, **P** to pause, and **R** to immediately redeploy.
+2. Hit **Play** (or tap the canvas) to start the match.
+3. Use the controls below, **P** to pause/resume, and **R** to restart instantly.
 
-## Gameplay Loop
+## Controls
 
-- **Collect Artifacts:** Nine floating skyshards spawn across the ruins. Your score tracks how many have been secured this run, and the best score persists via `localStorage`.
-- **Avoid Sentries:** Patrol units swap to a chase state whenever you drift inside their detection circles. Sprint to break line of sight or trigger an echo pulse to slow them down.
-- **Evac Flare:** After you secure every shard, a glowing evac zone activates somewhere on the map. Reach it without losing your last heart to finish the mission.
-- **HUD Feedback:** Live stats cover artifacts collected, best run, threat level, pulse cooldown, and the current objective so you always know what to do next.
+- **Player 1**
+  - Move: **A / D**
+  - Jump: **W**
+  - Punch: **F**
+  - Kick: **G**
+  - Block: **S**
+- **Player 2**
+  - Move: **← / →**
+  - Jump: **↑**
+  - Punch: **/**
+  - Kick: **.**
+  - Block: **↓**
+
+## Gameplay
+
+- **Win condition:** Reduce your opponent to **0 HP**, or have more HP when the **timer** reaches 0.
+- **Blocking:** Reduces incoming damage, but you can still get pushed around.
+- **Hitboxes:** Punch/kick only connect during the “active” frames (you’ll see a faint hitbox flash).
 
 ## Tuning & Customization
 
-- All knobs—including movement speeds, stamina behavior, sentinel density, and the extraction radius—live in the `config` object near the top of `app.js`.
-- Level geometry (ruins, patrol paths, artifact distribution) resides inside `app.js`, while UI copy/layout is defined in `index.html`.
-- Styling, neon glows, and responsive tweaks are contained in `styles.css`.
+- All gameplay knobs (gravity, movement, attack damage/knockback, round timer) live in the `config` object near the top of `app.js`.
+- UI copy/layout is in `index.html`.
+- Styling is in `styles.css`.

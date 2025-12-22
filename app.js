@@ -6,14 +6,14 @@ if (!canvas || !ctx) {
 }
 
 const ui = {
-  score: document.getElementById("score-value"),
-  best: document.getElementById("best-value"),
-  threat: document.getElementById("speed-value"),
+  p1: document.getElementById("p1-health-value"),
+  p2: document.getElementById("p2-health-value"),
+  round: document.getElementById("round-value"),
+  timer: document.getElementById("timer-value"),
   status: document.getElementById("status-text"),
-  loadTrack: document.getElementById("load-track"),
-  loadFill: document.getElementById("load-fill"),
-  loadText: document.getElementById("load-text"),
-  objective: document.getElementById("objective-value"),
+  meterTrack: document.getElementById("meter-track"),
+  meterFill: document.getElementById("meter-fill"),
+  meterText: document.getElementById("meter-text"),
 };
 
 const controls = {
@@ -22,123 +22,125 @@ const controls = {
   reset: document.getElementById("reset-btn"),
 };
 
-const BEST_KEY = "starwatchExpeditionBest";
-
 const config = {
-  playerSpeed: 230,
-  sprintMultiplier: 1.55,
-  staminaDrainRate: 1.35,
-  staminaRegenRate: 0.65,
-  playerRadius: 20,
-  artifactGoal: 9,
-  pulseCooldown: 6,
-  pulseDuration: 1.4,
-  worldPadding: 36,
-  sentinelSpeed: 60,
-  sentinelChaseSpeed: 120,
-  sentinelVision: 150,
-  sentinelHoldTime: 1.5,
-  sentinelRadius: 22,
-  pulseSlowMultiplier: 0.35,
-  maxHearts: 3,
-  extractionRadius: 60,
+  world: {
+    padding: 40,
+    gravity: 2600,
+    floorHeight: 90,
+    wallFriction: 0.98,
+    airDrag: 0.995,
+  },
+  round: {
+    timeSeconds: 60,
+    betweenRoundsDelay: 1.2,
+  },
+  fighter: {
+    maxHealth: 100,
+    radius: 16,
+    bodyHeight: 86,
+    moveSpeed: 420,
+    jumpVelocity: 980,
+    groundFriction: 0.82,
+    blockDamageMultiplier: 0.35,
+    invulnOnHit: 0.22,
+  },
+  attacks: {
+    punch: {
+      windup: 0.08,
+      active: 0.10,
+      recovery: 0.18,
+      damage: 8,
+      hitstun: 0.18,
+      knockbackX: 520,
+      knockbackY: 160,
+      range: 56,
+      height: 42,
+    },
+    kick: {
+      windup: 0.12,
+      active: 0.12,
+      recovery: 0.26,
+      damage: 14,
+      hitstun: 0.24,
+      knockbackX: 780,
+      knockbackY: 240,
+      range: 74,
+      height: 46,
+    },
+  },
+  meter: {
+    gainOnHit: 0.12,
+    gainOnDamageTaken: 0.08,
+  },
+  visuals: {
+    bgTop: "#070a17",
+    bgBottom: "#050710",
+    floor: "rgba(255,255,255,0.06)",
+    floorLine: "rgba(94,245,255,0.22)",
+    p1: "#66faff",
+    p2: "#ff7ae6",
+    text: "rgba(255,255,255,0.9)",
+    muted: "rgba(255,255,255,0.68)",
+  },
 };
 
-const spawnPoint = { x: canvas.width / 2, y: canvas.height - 110 };
-
-const ruins = [
-  { x: 80, y: 60, width: 260, height: 80 },
-  { x: 110, y: 210, width: 180, height: 90 },
-  { x: 360, y: 70, width: 160, height: 120 },
-  { x: 530, y: 180, width: 320, height: 80 },
-  { x: 620, y: 300, width: 240, height: 70 },
-  { x: 120, y: 360, width: 260, height: 120 },
-  { x: 440, y: 410, width: 180, height: 90 },
-  { x: 720, y: 420, width: 140, height: 80 },
-];
-
-const sentinelPresets = [
-  {
-    path: [
-      { x: 180, y: 150 },
-      { x: 420, y: 150 },
-      { x: 420, y: 260 },
-      { x: 180, y: 260 },
-    ],
-    vision: 160,
-  },
-  {
-    path: [
-      { x: 640, y: 120 },
-      { x: 860, y: 120 },
-      { x: 860, y: 220 },
-      { x: 640, y: 220 },
-    ],
-    vision: 150,
-  },
-  {
-    path: [
-      { x: 520, y: 330 },
-      { x: 780, y: 330 },
-      { x: 780, y: 480 },
-      { x: 520, y: 480 },
-    ],
-    vision: 175,
-  },
-];
-
-const moveBindings = new Map([
-  ["KeyW", "up"],
-  ["ArrowUp", "up"],
-  ["KeyS", "down"],
-  ["ArrowDown", "down"],
-  ["KeyA", "left"],
-  ["ArrowLeft", "left"],
-  ["KeyD", "right"],
-  ["ArrowRight", "right"],
-]);
-
-const player = createPlayer();
-const input = { up: false, down: false, left: false, right: false, sprint: false };
-let sentries = [];
-let artifacts = [];
+const input = {
+  p1: { left: false, right: false, jump: false, punch: false, kick: false, block: false },
+  p2: { left: false, right: false, jump: false, punch: false, kick: false, block: false },
+};
 
 const state = {
-  phase: "idle",
+  phase: "idle", // idle | playing | over
   paused: true,
-  score: 0,
-  best: loadBestScore(),
-  alertLevel: 0,
+  round: 1,
+  timeLeft: config.round.timeSeconds,
+  winnerText: "",
   lastTime: performance.now(),
-  pulse: { cooldown: 0, remaining: 0, wave: 0 },
-  lastOutcome: "",
-  extractionActive: false,
-  extractionPoint: selectExtractionPoint(),
+  betweenRounds: 0,
+  meter: 0, // 0..1 (shared "special meter" just for UI flair)
 };
+
+const arena = {
+  floorY: canvas.height - config.world.floorHeight,
+  leftX: config.world.padding,
+  rightX: canvas.width - config.world.padding,
+};
+
+const p1 = createFighter({
+  id: "p1",
+  color: config.visuals.p1,
+  x: canvas.width * 0.32,
+  y: arena.floorY,
+  facing: 1,
+  controls: input.p1,
+});
+
+const p2 = createFighter({
+  id: "p2",
+  color: config.visuals.p2,
+  x: canvas.width * 0.68,
+  y: arena.floorY,
+  facing: -1,
+  controls: input.p2,
+});
 
 init();
 
 function init() {
-  resetWorld();
-  resetToIdle();
   attachEvents();
-  requestAnimationFrame(gameLoop);
+  resetToIdle();
+  requestAnimationFrame(loop);
 }
 
 function attachEvents() {
   controls.play?.addEventListener("click", () => {
-    if (state.phase === "playing" && state.paused) {
-      resumeRun();
-    } else if (state.phase === "playing") {
-      startRun();
-    } else {
-      startRun();
-    }
+    if (state.phase === "playing" && state.paused) resume();
+    else start();
   });
 
   controls.pause?.addEventListener("click", () => {
     if (state.phase !== "playing") return;
-    state.paused ? resumeRun() : pauseRun();
+    state.paused ? resume() : pause();
   });
 
   controls.reset?.addEventListener("click", () => {
@@ -146,264 +148,374 @@ function attachEvents() {
   });
 
   canvas.addEventListener("pointerdown", () => {
-    if (state.phase === "playing" && !state.paused) {
-      triggerPulse();
-    } else if (state.phase === "playing" && state.paused) {
-      resumeRun();
-    } else {
-      startRun();
-    }
+    if (state.phase === "playing" && state.paused) resume();
+    else if (state.phase !== "playing") start();
   });
 
   window.addEventListener("keydown", (event) => {
     if (event.repeat) return;
-    const direction = moveBindings.get(event.code);
-    if (direction) {
-      event.preventDefault();
-      input[direction] = true;
-    }
 
-    if (event.code === "ShiftLeft" || event.code === "ShiftRight") {
-      input.sprint = true;
-    }
-
-    if (event.code === "Space") {
-      event.preventDefault();
-      triggerPulse();
-    }
-
+    // Global
     if (event.code === "KeyP") {
       event.preventDefault();
-      if (state.phase === "playing") {
-        state.paused ? resumeRun() : pauseRun();
-      }
+      if (state.phase === "playing") state.paused ? resume() : pause();
+      return;
     }
-
     if (event.code === "KeyR") {
       event.preventDefault();
-      startRun();
+      start();
+      return;
+    }
+
+    // P1: A/D move, W jump, F punch, G kick, S block
+    if (event.code === "KeyA") input.p1.left = true;
+    if (event.code === "KeyD") input.p1.right = true;
+    if (event.code === "KeyW") input.p1.jump = true;
+    if (event.code === "KeyF") input.p1.punch = true;
+    if (event.code === "KeyG") input.p1.kick = true;
+    if (event.code === "KeyS") input.p1.block = true;
+
+    // P2: Arrows move/jump, / punch, . kick, Down block
+    if (event.code === "ArrowLeft") {
+      event.preventDefault();
+      input.p2.left = true;
+    }
+    if (event.code === "ArrowRight") {
+      event.preventDefault();
+      input.p2.right = true;
+    }
+    if (event.code === "ArrowUp") {
+      event.preventDefault();
+      input.p2.jump = true;
+    }
+    if (event.code === "Slash") input.p2.punch = true;
+    if (event.code === "Period") input.p2.kick = true;
+    if (event.code === "ArrowDown") {
+      event.preventDefault();
+      input.p2.block = true;
     }
   });
 
   window.addEventListener("keyup", (event) => {
-    const direction = moveBindings.get(event.code);
-    if (direction) {
-      input[direction] = false;
-    }
-    if (event.code === "ShiftLeft" || event.code === "ShiftRight") {
-      input.sprint = false;
-    }
+    if (event.code === "KeyA") input.p1.left = false;
+    if (event.code === "KeyD") input.p1.right = false;
+    if (event.code === "KeyW") input.p1.jump = false;
+    if (event.code === "KeyF") input.p1.punch = false;
+    if (event.code === "KeyG") input.p1.kick = false;
+    if (event.code === "KeyS") input.p1.block = false;
+
+    if (event.code === "ArrowLeft") input.p2.left = false;
+    if (event.code === "ArrowRight") input.p2.right = false;
+    if (event.code === "ArrowUp") input.p2.jump = false;
+    if (event.code === "Slash") input.p2.punch = false;
+    if (event.code === "Period") input.p2.kick = false;
+    if (event.code === "ArrowDown") input.p2.block = false;
   });
 
   window.addEventListener("blur", () => {
     if (state.phase === "playing" && !state.paused) {
-      pauseRun();
-      setStatusText("Paused — focus lost.");
+      pause();
+      setStatus("Paused — focus lost.");
     }
   });
 }
 
-function gameLoop(timestamp = 0) {
-  const delta = Math.min((timestamp - state.lastTime) / 1000, 0.04) || 0;
+function loop(timestamp = 0) {
+  const dt = Math.min((timestamp - state.lastTime) / 1000, 0.04) || 0;
   state.lastTime = timestamp;
 
   if (state.phase === "playing" && !state.paused) {
-    update(delta);
+    update(dt);
   }
 
   draw();
-  requestAnimationFrame(gameLoop);
+  requestAnimationFrame(loop);
 }
 
 function update(dt) {
-  updatePulse(dt);
-  updatePlayer(dt);
-  updateArtifacts(dt);
-  checkExtractionProgress();
-  updateSentries(dt);
-  updateScoreUI();
-  updateThreatReadout();
-  updateLoadBar();
-  updateObjectiveReadout();
-  setStatusText(getStatusMessage());
-}
-
-function updatePulse(dt) {
-  if (state.pulse.cooldown > 0) {
-    state.pulse.cooldown = Math.max(0, state.pulse.cooldown - dt);
-  }
-  if (state.pulse.remaining > 0) {
-    state.pulse.remaining = Math.max(0, state.pulse.remaining - dt);
-  }
-  if (state.pulse.wave > 0) {
-    state.pulse.wave = Math.max(0, state.pulse.wave - dt);
-  }
-  if (player.invulnerable > 0) {
-    player.invulnerable = Math.max(0, player.invulnerable - dt);
-  }
-}
-
-function updatePlayer(dt) {
-  const moveVector = { x: 0, y: 0 };
-  if (input.up) moveVector.y -= 1;
-  if (input.down) moveVector.y += 1;
-  if (input.left) moveVector.x -= 1;
-  if (input.right) moveVector.x += 1;
-
-  const moving = moveVector.x !== 0 || moveVector.y !== 0;
-  if (moving) {
-    const length = Math.hypot(moveVector.x, moveVector.y) || 1;
-    moveVector.x /= length;
-    moveVector.y /= length;
-    player.heading = Math.atan2(moveVector.y, moveVector.x);
-  }
-
-  let speed = config.playerSpeed;
-  if (input.sprint && moving && player.stamina > 0.05) {
-    speed *= config.sprintMultiplier;
-    player.stamina = Math.max(0, player.stamina - config.staminaDrainRate * dt);
+  if (state.betweenRounds > 0) {
+    state.betweenRounds = Math.max(0, state.betweenRounds - dt);
   } else {
-    player.stamina = Math.min(1, player.stamina + config.staminaRegenRate * dt);
+    state.timeLeft = Math.max(0, state.timeLeft - dt);
   }
 
-  const dx = moveVector.x * speed * dt;
-  const dy = moveVector.y * speed * dt;
-  moveWithCollisions(player, dx, dy);
-}
+  // Face each other
+  p1.facing = p2.x >= p1.x ? 1 : -1;
+  p2.facing = p1.x >= p2.x ? 1 : -1;
 
-function moveWithCollisions(entity, dx, dy) {
-  entity.x += dx;
-  clampToWorld(entity);
-  for (const ruin of ruins) {
-    if (circleRectIntersect(entity.x, entity.y, entity.radius, ruin)) {
-      if (dx > 0) {
-        entity.x = ruin.x - entity.radius;
-      } else if (dx < 0) {
-        entity.x = ruin.x + ruin.width + entity.radius;
-      }
-    }
-  }
+  updateFighter(p1, p2, dt);
+  updateFighter(p2, p1, dt);
 
-  entity.y += dy;
-  clampToWorld(entity);
-  for (const ruin of ruins) {
-    if (circleRectIntersect(entity.x, entity.y, entity.radius, ruin)) {
-      if (dy > 0) {
-        entity.y = ruin.y - entity.radius;
-      } else if (dy < 0) {
-        entity.y = ruin.y + ruin.height + entity.radius;
-      }
-    }
+  resolveAttack(p1, p2);
+  resolveAttack(p2, p1);
+
+  state.meter = clamp01(state.meter - dt * 0.06);
+  updateUI();
+
+  if (p1.health <= 0 || p2.health <= 0 || state.timeLeft <= 0) {
+    endRound();
   }
 }
 
-function clampToWorld(entity) {
-  entity.x = clamp(entity.x, config.worldPadding, canvas.width - config.worldPadding);
-  entity.y = clamp(entity.y, config.worldPadding, canvas.height - config.worldPadding);
-}
+function updateFighter(me, other, dt) {
+  if (me.dead) return;
 
-function updateArtifacts(dt) {
-  for (const artifact of artifacts) {
-    artifact.wobble += dt * 2.4;
-    artifact.flash = Math.max(0, artifact.flash - dt);
-    if (artifact.collected) continue;
-    const dist = distance(entityPosition(player), artifact);
-    if (dist <= player.radius + artifact.radius - 2) {
-      artifact.collected = true;
-      artifact.flash = 0.4;
-      state.score += 1;
-    }
-  }
-}
+  if (me.invuln > 0) me.invuln = Math.max(0, me.invuln - dt);
+  if (me.hitstun > 0) me.hitstun = Math.max(0, me.hitstun - dt);
 
-function checkExtractionProgress() {
-  if (!state.extractionActive && state.score >= config.artifactGoal) {
-    state.extractionActive = true;
-    updateObjectiveReadout();
-    setStatusText(getStatusMessage());
-  }
-
-  if (
-    state.extractionActive &&
-    distance(entityPosition(player), state.extractionPoint) <= config.extractionRadius + player.radius - 6
-  ) {
-    winRun();
-  }
-}
-
-function updateSentries(dt) {
-  let chasing = 0;
-  for (const sentinel of sentries) {
-    const target = sentinel.state === "chase" ? player : sentinel.path[sentinel.pathIndex];
-    const baseSpeed = sentinel.state === "chase" ? config.sentinelChaseSpeed : config.sentinelSpeed;
-    const slowFactor = state.pulse.remaining > 0 ? config.pulseSlowMultiplier : 1;
-    const speed = baseSpeed * slowFactor;
-    const angle = Math.atan2(target.y - sentinel.y, target.x - sentinel.x);
-    sentinel.x += Math.cos(angle) * speed * dt;
-    sentinel.y += Math.sin(angle) * speed * dt;
-
-    if (sentinel.state === "chase") {
-      sentinel.alertTimer = config.sentinelHoldTime;
-    }
-
-    const distToPlayer = distance(entityPosition(player), sentinel);
-    const vision = sentinel.vision;
-    if (distToPlayer <= vision) {
-      sentinel.state = "chase";
-    } else if (sentinel.state === "chase") {
-      sentinel.alertTimer -= dt;
-      if (sentinel.alertTimer <= 0) {
-        sentinel.state = "patrol";
-      }
-    }
-
-    if (sentinel.state !== "chase") {
-      const pathTarget = sentinel.path[sentinel.pathIndex];
-      if (distance(pathTarget, sentinel) < 6) {
-        sentinel.pathIndex = (sentinel.pathIndex + 1) % sentinel.path.length;
-      }
+  // Attack timer
+  if (me.attack.timer > 0) {
+    me.attack.timer = Math.max(0, me.attack.timer - dt);
+    const def = me.attack.def;
+    if (!def) {
+      me.attack.phase = "none";
     } else {
-      chasing += 1;
+      const total = def.windup + def.active + def.recovery;
+      const elapsed = total - me.attack.timer;
+      if (elapsed < def.windup) me.attack.phase = "windup";
+      else if (elapsed < def.windup + def.active) me.attack.phase = "active";
+      else me.attack.phase = "recovery";
     }
-
-    if (distToPlayer < sentinel.radius + player.radius - 4) {
-      handlePlayerHit();
+    if (me.attack.timer <= 0) {
+      me.attack.def = null;
+      me.attack.phase = "none";
+      me.attack.hasHit = false;
     }
   }
 
-  state.alertLevel = chasing;
+  const onGround = me.y >= arena.floorY;
+  if (onGround) {
+    me.y = arena.floorY;
+    if (me.vy > 0) me.vy = 0;
+    me.jumpsLeft = 1;
+  }
+
+  const wantsBlock = !!me.controls.block && me.hitstun <= 0;
+  me.blocking = wantsBlock && me.attack.phase === "none";
+
+  const canAct = me.hitstun <= 0 && me.attack.phase === "none";
+
+  // Start attack (edge-triggered)
+  if (canAct && !me.blocking) {
+    if (me.controls.punch && !me.prevControls.punch) {
+      beginAttack(me, "punch");
+    } else if (me.controls.kick && !me.prevControls.kick) {
+      beginAttack(me, "kick");
+    }
+  }
+
+  // Movement
+  let move = 0;
+  if (canAct && !me.blocking) {
+    if (me.controls.left) move -= 1;
+    if (me.controls.right) move += 1;
+  }
+
+  const targetVx = move * config.fighter.moveSpeed;
+  const accel = onGround ? 0.34 : 0.18;
+  me.vx = lerp(me.vx, targetVx, accel);
+
+  // Jump (edge-triggered)
+  if (canAct && me.controls.jump && !me.prevControls.jump && me.jumpsLeft > 0) {
+    me.vy = -config.fighter.jumpVelocity;
+    me.jumpsLeft -= 1;
+  }
+
+  // Physics
+  me.vy += config.world.gravity * dt;
+  me.x += me.vx * dt;
+  me.y += me.vy * dt;
+
+  // World bounds
+  const minX = arena.leftX + config.fighter.radius;
+  const maxX = arena.rightX - config.fighter.radius;
+  if (me.x < minX) {
+    me.x = minX;
+    me.vx *= -0.15;
+  } else if (me.x > maxX) {
+    me.x = maxX;
+    me.vx *= -0.15;
+  }
+
+  if (me.y > arena.floorY) {
+    me.y = arena.floorY;
+    me.vy = 0;
+  }
+
+  if (onGround) {
+    me.vx *= config.fighter.groundFriction;
+  } else {
+    me.vx *= config.world.airDrag;
+  }
+
+  // Light "push" so they don't overlap too deeply
+  const dx = other.x - me.x;
+  const minDist = config.fighter.radius * 2 + 10;
+  if (Math.abs(dx) < minDist && Math.abs(other.y - me.y) < config.fighter.bodyHeight * 0.6) {
+    const push = (minDist - Math.abs(dx)) * 0.5;
+    me.x -= Math.sign(dx || 1) * push;
+  }
+
+  me.prevControls = { ...me.controls };
 }
 
-function handlePlayerHit() {
-  if (player.invulnerable > 0) return;
-  player.health -= 1;
-  player.invulnerable = 1.2;
-  player.x = spawnPoint.x;
-  player.y = spawnPoint.y;
-  player.stamina = 1;
-  if (player.health <= 0) {
-    endRun("Sentries overwhelmed the scout.");
+function beginAttack(fighter, type) {
+  const def = config.attacks[type];
+  fighter.attack.def = def;
+  fighter.attack.type = type;
+  fighter.attack.phase = "windup";
+  fighter.attack.hasHit = false;
+  fighter.attack.timer = def.windup + def.active + def.recovery;
+}
+
+function resolveAttack(attacker, defender) {
+  if (attacker.dead || defender.dead) return;
+  if (attacker.attack.phase !== "active") return;
+  if (attacker.attack.hasHit) return;
+  if (defender.invuln > 0) return;
+
+  const hitbox = getHitbox(attacker);
+  const hurtbox = getHurtbox(defender);
+  if (!rectsOverlap(hitbox, hurtbox)) return;
+
+  const def = attacker.attack.def;
+  if (!def) return;
+
+  attacker.attack.hasHit = true;
+
+  // Block only works when the attacker is in front of the defender (i.e. in the defender's facing direction).
+  const blocked = defender.blocking && Math.sign(attacker.x - defender.x) === defender.facing;
+  const damage = blocked ? Math.ceil(def.damage * config.fighter.blockDamageMultiplier) : def.damage;
+
+  defender.health = Math.max(0, defender.health - damage);
+  defender.hitstun = def.hitstun * (blocked ? 0.65 : 1);
+  defender.invuln = config.fighter.invulnOnHit;
+
+  // Knockback
+  const dir = attacker.facing;
+  defender.vx = dir * def.knockbackX * (blocked ? 0.55 : 1);
+  defender.vy = -def.knockbackY * (blocked ? 0.55 : 1);
+
+  // Meter (UI only)
+  state.meter = clamp01(state.meter + config.meter.gainOnHit);
+}
+
+function endRound() {
+  if (state.phase !== "playing") return;
+
+  state.phase = "over";
+  state.paused = true;
+
+  const p1Alive = p1.health > 0;
+  const p2Alive = p2.health > 0;
+
+  if (p1Alive && !p2Alive) state.winnerText = "Player 1 wins!";
+  else if (!p1Alive && p2Alive) state.winnerText = "Player 2 wins!";
+  else if (p1.health === p2.health) state.winnerText = "Draw!";
+  else state.winnerText = p1.health > p2.health ? "Player 1 wins!" : "Player 2 wins!";
+
+  setStatus(`${state.winnerText} Press Play (or R) to restart.`);
+  updateControls();
+  updateUI();
+}
+
+function start() {
+  state.phase = "playing";
+  state.paused = false;
+  state.timeLeft = config.round.timeSeconds;
+  state.winnerText = "";
+  state.betweenRounds = 0;
+  state.meter = 0;
+  state.round = Math.max(1, state.round);
+
+  resetFighter(p1, canvas.width * 0.32, 1);
+  resetFighter(p2, canvas.width * 0.68, -1);
+
+  setStatus("Fight!");
+  updateControls();
+  updateUI();
+}
+
+function resetToIdle() {
+  state.phase = "idle";
+  state.paused = true;
+  state.round = 1;
+  state.timeLeft = config.round.timeSeconds;
+  state.winnerText = "";
+  state.betweenRounds = 0;
+  state.meter = 0;
+
+  resetFighter(p1, canvas.width * 0.32, 1);
+  resetFighter(p2, canvas.width * 0.68, -1);
+
+  setStatus("Tap Play to begin.");
+  updateControls();
+  updateUI();
+}
+
+function pause() {
+  if (state.phase !== "playing") return;
+  state.paused = true;
+  setStatus("Paused — press Play or P.");
+  updateControls();
+}
+
+function resume() {
+  if (state.phase !== "playing") return;
+  state.paused = false;
+  setStatus("Fight!");
+  updateControls();
+}
+
+function updateControls() {
+  if (controls.pause) {
+    controls.pause.disabled = state.phase !== "playing";
+    controls.pause.textContent = state.paused ? "Resume" : "Pause";
   }
+  if (controls.play) {
+    let label = "Play";
+    if (state.phase === "playing") label = state.paused ? "Resume" : "Restart";
+    if (state.phase === "over") label = "Play Again";
+    controls.play.textContent = label;
+  }
+}
+
+function updateUI() {
+  if (ui.p1) ui.p1.textContent = String(Math.max(0, Math.floor(p1.health)));
+  if (ui.p2) ui.p2.textContent = String(Math.max(0, Math.floor(p2.health)));
+  if (ui.round) ui.round.textContent = String(state.round);
+  if (ui.timer) ui.timer.textContent = String(Math.max(0, Math.ceil(state.timeLeft)));
+
+  if (ui.meterFill && ui.meterTrack && ui.meterText) {
+    const percent = Math.round(clamp01(state.meter) * 100);
+    ui.meterFill.style.width = `${percent}%`;
+    ui.meterTrack.setAttribute("aria-valuenow", String(percent));
+    ui.meterText.textContent = `${percent}%`;
+  }
+}
+
+function setStatus(message) {
+  if (ui.status) ui.status.textContent = message;
 }
 
 function draw() {
-  drawBackdrop();
-  drawRuins();
-  drawArtifacts();
-  drawExtractionZone();
-  drawPulseWave();
-  drawSentries();
-  drawPlayer();
-  drawOverlay();
+  drawBackground();
+  drawFloor();
+  drawHUDOverlay();
+  drawFighter(p1);
+  drawFighter(p2);
+  drawCenterPrompt();
 }
 
-function drawBackdrop() {
-  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, "#051125");
-  gradient.addColorStop(1, "#020812");
-  ctx.fillStyle = gradient;
+function drawBackground() {
+  const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  g.addColorStop(0, config.visuals.bgTop);
+  g.addColorStop(1, config.visuals.bgBottom);
+  ctx.fillStyle = g;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  // subtle grid
+  ctx.save();
   ctx.strokeStyle = "rgba(94,245,255,0.05)";
   ctx.lineWidth = 1;
   for (let x = 0; x <= canvas.width; x += 60) {
@@ -418,492 +530,272 @@ function drawBackdrop() {
     ctx.lineTo(canvas.width, y);
     ctx.stroke();
   }
+  ctx.restore();
 }
 
-function drawRuins() {
-  for (const ruin of ruins) {
-    ctx.fillStyle = "rgba(14, 24, 46, 0.92)";
-    ctx.strokeStyle = "rgba(94,245,255,0.2)";
-    ctx.lineWidth = 2;
-    roundedRectPath(ruin.x, ruin.y, ruin.width, ruin.height, 14);
-    ctx.fill();
-    ctx.stroke();
-  }
+function drawFloor() {
+  ctx.save();
+  ctx.fillStyle = config.visuals.floor;
+  ctx.fillRect(0, arena.floorY, canvas.width, canvas.height - arena.floorY);
+  ctx.strokeStyle = config.visuals.floorLine;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, arena.floorY);
+  ctx.lineTo(canvas.width, arena.floorY);
+  ctx.stroke();
+  ctx.restore();
 }
 
-function drawArtifacts() {
-  for (const artifact of artifacts) {
-    const wobble = Math.sin(artifact.wobble) * 4;
-    const radius = artifact.radius + wobble * 0.2;
-    const gradient = ctx.createRadialGradient(artifact.x, artifact.y, radius * 0.2, artifact.x, artifact.y, radius);
-    const baseColor = artifact.collected ? "rgba(255,255,255,0.02)" : "rgba(94,245,255,0.6)";
-    gradient.addColorStop(0, "#fef9d7");
-    gradient.addColorStop(0.6, artifact.collected ? "rgba(255,255,255,0.08)" : "rgba(94,245,255,0.7)");
-    gradient.addColorStop(1, artifact.collected ? "rgba(94,245,255,0.08)" : "rgba(94,245,255,0)");
-    ctx.beginPath();
-    ctx.fillStyle = gradient;
-    ctx.arc(artifact.x, artifact.y - wobble, radius, 0, Math.PI * 2);
-    ctx.fill();
+function drawHUDOverlay() {
+  // Health bars (simple, on-canvas)
+  const pad = 26;
+  const barW = canvas.width * 0.36;
+  const barH = 14;
+  const top = 22;
 
-    if (artifact.flash > 0) {
-      ctx.save();
-      ctx.globalAlpha = artifact.flash * 2;
-      ctx.strokeStyle = "rgba(255,255,255,0.6)";
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(artifact.x, artifact.y - wobble, radius + artifact.flash * 40, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-  }
+  drawBar(pad, top, barW, barH, p1.health / config.fighter.maxHealth, config.visuals.p1, "P1");
+  drawBar(canvas.width - pad - barW, top, barW, barH, p2.health / config.fighter.maxHealth, config.visuals.p2, "P2");
+
+  // Timer
+  ctx.save();
+  ctx.fillStyle = config.visuals.text;
+  ctx.font = "700 22px Montserrat, system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(String(Math.max(0, Math.ceil(state.timeLeft))), canvas.width / 2, top + 12);
+  ctx.restore();
 }
 
-function drawExtractionZone() {
-  const target = state.extractionPoint;
-  if (!target) return;
-  const radius = config.extractionRadius;
-  const time = performance.now() / 600;
-  const pulse = (Math.sin(time * 2) + 1) * 0.5;
-  const outerRadius = radius + 12 + pulse * 20;
+function drawBar(x, y, w, h, ratio, color, label) {
+  const clamped = clamp01(ratio);
+  ctx.save();
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  roundRect(x, y, w, h, 999);
+  ctx.fill();
+
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.9;
+  roundRect(x, y, w * clamped, h, 999);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.globalAlpha = 1;
+  ctx.font = "600 12px Montserrat, system-ui, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(label, x, y + h + 14);
+  ctx.restore();
+}
+
+function drawFighter(f) {
+  const t = performance.now() / 1000;
+  const onGround = f.y >= arena.floorY - 0.5;
+  const speed = Math.abs(f.vx);
+  const bob = onGround ? Math.sin(t * (1.8 + speed * 0.004)) * 2.2 : 0;
+
+  // Pose weights
+  const attacking = f.attack.phase !== "none";
+  const blocking = f.blocking;
+  const stunned = f.hitstun > 0;
+  const alpha = f.invuln > 0 ? 0.65 : 1;
+
+  const head = { x: f.x, y: f.y - config.fighter.bodyHeight + bob };
+  const neck = { x: f.x, y: f.y - 58 + bob };
+  const hip = { x: f.x, y: f.y - 20 + bob };
+
+  const step = onGround ? Math.sin(t * (2.8 + speed * 0.006)) * 8 * (speed > 20 ? 1 : 0) : 0;
+  const legA = { x: hip.x - 10, y: hip.y + 8 };
+  const legB = { x: hip.x + 10, y: hip.y + 8 };
+  const footA = { x: f.x - 12 + step * 0.6, y: f.y };
+  const footB = { x: f.x + 12 - step * 0.6, y: f.y };
+
+  const facing = f.facing;
+  const armRoot = { x: f.x, y: f.y - 52 + bob };
+  const armOut = blocking
+    ? { x: armRoot.x + facing * 16, y: armRoot.y + 4 }
+    : attacking
+      ? { x: armRoot.x + facing * 44, y: armRoot.y + (f.attack.type === "kick" ? 10 : -4) }
+      : { x: armRoot.x + facing * 26, y: armRoot.y + Math.sin(t * 3) * 3 };
+
+  const backArmOut = { x: armRoot.x - facing * 18, y: armRoot.y + 6 + Math.cos(t * 2.7) * 3 };
 
   ctx.save();
-  const gradient = ctx.createRadialGradient(target.x, target.y, radius * 0.4, target.x, target.y, outerRadius);
-  if (state.extractionActive) {
-    gradient.addColorStop(0, "rgba(94,245,255,0.6)");
-    gradient.addColorStop(1, "rgba(94,245,255,0)");
+  ctx.globalAlpha = alpha;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  // Glow
+  ctx.shadowBlur = 18;
+  ctx.shadowColor = f.color;
+
+  // Body
+  ctx.strokeStyle = f.color;
+  ctx.lineWidth = 6;
+  line(head.x, head.y + 18, neck.x, neck.y);
+  line(neck.x, neck.y, hip.x, hip.y);
+
+  // Arms
+  ctx.lineWidth = 5.5;
+  if (stunned) {
+    line(armRoot.x, armRoot.y, armRoot.x + facing * 10, armRoot.y + 22);
+    line(armRoot.x, armRoot.y, armRoot.x - facing * 10, armRoot.y + 22);
   } else {
-    gradient.addColorStop(0, "rgba(255,192,125,0.35)");
-    gradient.addColorStop(1, "rgba(255,192,125,0)");
+    line(armRoot.x, armRoot.y, armOut.x, armOut.y);
+    line(armRoot.x, armRoot.y, backArmOut.x, backArmOut.y);
   }
-  ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.arc(target.x, target.y, outerRadius, 0, Math.PI * 2);
-  ctx.fill();
 
-  ctx.strokeStyle = state.extractionActive ? "#5ef5ff" : "rgba(255,198,155,0.7)";
-  ctx.lineWidth = state.extractionActive ? 3 : 2;
-  ctx.setLineDash(state.extractionActive ? [] : [10, 8]);
+  // Legs
+  ctx.lineWidth = 6;
+  line(hip.x, hip.y, legA.x, legA.y);
+  line(hip.x, hip.y, legB.x, legB.y);
+  ctx.lineWidth = 5.5;
+  line(legA.x, legA.y, footA.x, footA.y);
+  line(legB.x, legB.y, footB.x, footB.y);
+
+  // Head
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.shadowBlur = 22;
+  ctx.shadowColor = f.color;
   ctx.beginPath();
-  ctx.arc(target.x, target.y, radius, 0, Math.PI * 2);
+  ctx.arc(head.x, head.y, 16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = f.color;
+  ctx.lineWidth = 4;
   ctx.stroke();
 
-  ctx.font = "600 14px Montserrat, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillStyle = state.extractionActive ? "#c8feff" : "rgba(255,233,208,0.85)";
-  ctx.fillText(state.extractionActive ? "EVAC READY" : "EVAC LOCKED", target.x, target.y - radius - 12);
-  ctx.fillStyle = "rgba(255,255,255,0.9)";
-  ctx.fillText("EVAC FLARE", target.x, target.y + radius + 22);
-  ctx.restore();
-}
-
-function drawPulseWave() {
-  if (state.pulse.wave <= 0) return;
-  const ratio = state.pulse.wave / config.pulseDuration;
-  const radius = (1 - ratio) * Math.max(canvas.width, canvas.height) * 1.2;
-  ctx.save();
-  const gradient = ctx.createRadialGradient(player.x, player.y, radius * 0.1, player.x, player.y, radius);
-  gradient.addColorStop(0, "rgba(94,245,255,0.35)");
-  gradient.addColorStop(1, "rgba(94,245,255,0)");
-  ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.arc(player.x, player.y, radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawSentries() {
-  for (const sentinel of sentries) {
+  // Attack effect
+  if (f.attack.phase === "active") {
+    const hb = getHitbox(f);
     ctx.save();
-    ctx.strokeStyle = sentinel.state === "chase" ? "rgba(255,122,122,0.25)" : "rgba(255,255,255,0.08)";
-    ctx.lineWidth = 1;
-    ctx.setLineDash([6, 10]);
-    ctx.beginPath();
-    ctx.arc(sentinel.x, sentinel.y, sentinel.vision, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.save();
-    ctx.fillStyle = sentinel.state === "chase" ? "#ff7a7a" : "#f9c86b";
-    ctx.shadowBlur = 18;
-    ctx.shadowColor = ctx.fillStyle;
-    ctx.beginPath();
-    ctx.arc(sentinel.x, sentinel.y, sentinel.radius, 0, Math.PI * 2);
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = f.color;
+    ctx.shadowBlur = 0;
+    roundRect(hb.x, hb.y, hb.w, hb.h, 10);
     ctx.fill();
     ctx.restore();
   }
-}
 
-function drawPlayer() {
-  ctx.save();
-  ctx.fillStyle = "#fefefe";
-  ctx.shadowColor = "rgba(94,245,255,0.6)";
-  ctx.shadowBlur = 20;
-  ctx.beginPath();
-  ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-  ctx.fill();
-
-  const indicatorLength = player.radius + 12;
-  ctx.strokeStyle = "#5ef5ff";
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(player.x, player.y);
-  ctx.lineTo(
-    player.x + Math.cos(player.heading) * indicatorLength,
-    player.y + Math.sin(player.heading) * indicatorLength
-  );
-  ctx.stroke();
-
-  ctx.strokeStyle = "rgba(94,245,255,0.65)";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(
-    player.x,
-    player.y,
-    player.radius + 10,
-    -Math.PI / 2,
-    -Math.PI / 2 + Math.PI * 2 * player.stamina
-  );
-  ctx.stroke();
   ctx.restore();
-
-  if (player.invulnerable > 0) {
-    ctx.save();
-    ctx.strokeStyle = "rgba(255,255,255,0.6)";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([4, 6]);
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, player.radius + 6, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-  }
 }
 
-function drawOverlay() {
-  if (state.phase !== "over" && state.phase !== "won") return;
+function drawCenterPrompt() {
+  if (state.phase === "idle") return;
+  if (state.phase !== "over") return;
+
   ctx.save();
-  ctx.fillStyle = "rgba(2, 8, 16, 0.75)";
+  ctx.fillStyle = "rgba(2, 8, 16, 0.72)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#fefefe";
+  ctx.fillStyle = "#ffffff";
   ctx.textAlign = "center";
-  ctx.font = "700 36px Montserrat, sans-serif";
-  const title = state.phase === "won" ? "Extraction Ready" : "Run Lost";
-  ctx.fillText(title, canvas.width / 2, canvas.height / 2 - 10);
-  ctx.font = "600 18px Montserrat, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.8)";
-  ctx.fillText("Tap Play to deploy again", canvas.width / 2, canvas.height / 2 + 24);
+  ctx.font = "700 38px Montserrat, system-ui, sans-serif";
+  ctx.fillText(state.winnerText || "Round over", canvas.width / 2, canvas.height / 2 - 10);
+  ctx.fillStyle = config.visuals.muted;
+  ctx.font = "600 16px Montserrat, system-ui, sans-serif";
+  ctx.fillText("Press Play (or R) to restart", canvas.width / 2, canvas.height / 2 + 26);
   ctx.restore();
 }
 
-function triggerPulse() {
-  if (state.phase !== "playing" || state.paused) return;
-  if (state.pulse.cooldown > 0) return;
-  state.pulse.cooldown = config.pulseCooldown;
-  state.pulse.remaining = config.pulseDuration;
-  state.pulse.wave = config.pulseDuration;
-}
-
-function updateScoreUI() {
-  const scoreValue = Math.max(0, Math.floor(state.score));
-  if (ui.score) ui.score.textContent = `${scoreValue}/${config.artifactGoal}`;
-  if (scoreValue > state.best) {
-    state.best = scoreValue;
-    saveBestScore(scoreValue);
-  }
-  if (ui.best) ui.best.textContent = `${state.best}`;
-}
-
-function updateThreatReadout() {
-  if (!ui.threat) return;
-  const labels = ["Calm", "Tracking", "Hunted", "Critical"];
-  const index = clamp(Math.floor(state.alertLevel), 0, labels.length - 1);
-  ui.threat.textContent = labels[index];
-}
-
-function updateLoadBar() {
-  if (!ui.loadFill || !ui.loadTrack || !ui.loadText) return;
-  const ratio = config.pulseCooldown > 0 ? 1 - state.pulse.cooldown / config.pulseCooldown : 1;
-  const clamped = clamp(ratio, 0, 1);
-  const percent = Math.round(clamped * 100);
-  ui.loadFill.style.width = `${percent}%`;
-  ui.loadTrack.setAttribute("aria-valuenow", percent.toString());
-  ui.loadText.textContent = percent >= 100 ? "Ready" : `${percent}%`;
-}
-
-function updateObjectiveReadout() {
-  if (!ui.objective) return;
-  let message = "Standby";
-  if (state.phase === "idle") {
-    message = `Collect ${config.artifactGoal} shards`;
-  } else if (state.phase === "playing") {
-    if (state.paused) {
-      message = "Paused";
-    } else if (state.extractionActive) {
-      message = "Reach evac flare";
-    } else {
-      const remaining = Math.max(0, config.artifactGoal - state.score);
-      message = `${remaining} shards left`;
-    }
-  } else if (state.phase === "won") {
-    message = "Extraction complete";
-  } else if (state.phase === "over") {
-    message = "Recon failed";
-  }
-  ui.objective.textContent = message;
-}
-
-function getStatusMessage() {
-  const remaining = Math.max(0, config.artifactGoal - state.score);
-  if (state.phase === "idle") {
-    return `Tap Play to deploy. Collect ${config.artifactGoal} skyshards.`;
-  }
-  if (state.phase === "playing") {
-    if (state.paused) {
-      return "Paused — press Play or P.";
-    }
-    if (state.extractionActive) {
-      return `All shards secured — reach the evac flare! • Hearts ${player.health}/${config.maxHearts}`;
-    }
-    return `${remaining} artifacts remain • Hearts ${player.health}/${config.maxHearts}`;
-  }
-  if (state.phase === "won") {
-    return "All shards secured. Extraction shuttle inbound.";
-  }
-  return "Sentries overwhelmed the scout. Tap Play to retry.";
-}
-
-function setStatusText(message) {
-  if (ui.status) {
-    ui.status.textContent = message;
-  }
-}
-
-function resetWorld() {
-  resetPlayerState();
-  state.extractionActive = false;
-  state.extractionPoint = selectExtractionPoint();
-  sentries = sentinelPresets.map(createSentinel);
-  artifacts = [];
-  spawnArtifacts(config.artifactGoal);
-}
-
-function resetPlayerState() {
-  player.x = spawnPoint.x;
-  player.y = spawnPoint.y;
-  player.radius = config.playerRadius;
-  player.heading = -Math.PI / 2;
-  player.stamina = 1;
-  player.invulnerable = 0;
-  player.health = config.maxHearts;
-}
-
-function spawnArtifacts(targetCount) {
-  let attempts = 0;
-  while (artifacts.length < targetCount && attempts < 600) {
-    attempts += 1;
-    const candidate = {
-      x: randBetween(config.worldPadding, canvas.width - config.worldPadding),
-      y: randBetween(config.worldPadding, canvas.height - config.worldPadding),
-      radius: randBetween(14, 20),
-      wobble: Math.random() * Math.PI * 2,
-      flash: 0,
-      collected: false,
-    };
-    const intersectsRuin = ruins.some((zone) => circleRectIntersect(candidate.x, candidate.y, candidate.radius + 6, zone));
-    if (!intersectsRuin) {
-      artifacts.push(candidate);
-    }
-  }
-}
-
-function selectExtractionPoint() {
-  let attempts = 0;
-  const padding = config.worldPadding + config.extractionRadius + 10;
-  while (attempts < 400) {
-    attempts += 1;
-    const candidate = {
-      x: randBetween(padding, canvas.width - padding),
-      y: randBetween(padding, canvas.height - padding),
-    };
-    const intersectsRuin = ruins.some((zone) =>
-      circleRectIntersect(candidate.x, candidate.y, config.extractionRadius + 18, zone)
-    );
-    if (!intersectsRuin) {
-      return candidate;
-    }
-  }
-  return { x: canvas.width / 2, y: canvas.height / 2 };
-}
-
-function startRun() {
-  state.phase = "playing";
-  state.paused = false;
-  state.score = 0;
-  state.alertLevel = 0;
-  state.pulse.cooldown = 0;
-  state.pulse.remaining = 0;
-  state.pulse.wave = 0;
-  resetWorld();
-  updateScoreUI();
-  updateThreatReadout();
-  updateLoadBar();
-  updateObjectiveReadout();
-  setStatusText(getStatusMessage());
-  updateControls();
-}
-
-function resetToIdle() {
-  state.phase = "idle";
-  state.paused = true;
-  state.score = 0;
-  state.alertLevel = 0;
-  state.pulse.cooldown = 0;
-  state.pulse.remaining = 0;
-  state.pulse.wave = 0;
-  resetWorld();
-  updateScoreUI();
-  updateThreatReadout();
-  updateLoadBar();
-  updateObjectiveReadout();
-  setStatusText(getStatusMessage());
-  updateControls();
-}
-
-function pauseRun() {
-  if (state.phase !== "playing" || state.paused) return;
-  state.paused = true;
-  setStatusText(getStatusMessage());
-  updateObjectiveReadout();
-  updateControls();
-}
-
-function resumeRun() {
-  if (state.phase !== "playing" || !state.paused) return;
-  state.paused = false;
-  setStatusText(getStatusMessage());
-  updateObjectiveReadout();
-  updateControls();
-}
-
-function winRun() {
-  state.phase = "won";
-  state.paused = true;
-  state.extractionActive = false;
-  updateScoreUI();
-  updateControls();
-  setStatusText(getStatusMessage());
-  updateObjectiveReadout();
-}
-
-function endRun(reason) {
-  state.phase = "over";
-  state.paused = true;
-  state.lastOutcome = reason;
-  state.extractionActive = false;
-  updateControls();
-  setStatusText(getStatusMessage());
-  updateObjectiveReadout();
-}
-
-function updateControls() {
-  if (controls.pause) {
-    controls.pause.disabled = state.phase !== "playing";
-    controls.pause.textContent = state.paused ? "Resume" : "Pause";
-  }
-  if (controls.play) {
-    let label = "Play";
-    if (state.phase === "playing") {
-      label = state.paused ? "Resume" : "Restart";
-    } else if (state.phase === "won") {
-      label = "Replay";
-    } else if (state.phase === "over") {
-      label = "Play Again";
-    }
-    controls.play.textContent = label;
-  }
-}
-
-function createPlayer() {
+function createFighter({ id, color, x, y, facing, controls }) {
   return {
-    x: spawnPoint.x,
-    y: spawnPoint.y,
-    radius: config.playerRadius,
-    heading: -Math.PI / 2,
-    stamina: 1,
-    invulnerable: 0,
-    health: config.maxHearts,
+    id,
+    color,
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    facing,
+    health: config.fighter.maxHealth,
+    dead: false,
+    hitstun: 0,
+    invuln: 0,
+    blocking: false,
+    jumpsLeft: 1,
+    controls,
+    prevControls: { ...controls },
+    attack: {
+      type: "",
+      def: null,
+      timer: 0,
+      phase: "none", // none | windup | active | recovery
+      hasHit: false,
+    },
   };
 }
 
-function createSentinel({ path, vision = config.sentinelVision }) {
-  const start = path[0];
+function resetFighter(f, x, facing) {
+  f.x = x;
+  f.y = arena.floorY;
+  f.vx = 0;
+  f.vy = 0;
+  f.facing = facing;
+  f.health = config.fighter.maxHealth;
+  f.dead = false;
+  f.hitstun = 0;
+  f.invuln = 0;
+  f.blocking = false;
+  f.jumpsLeft = 1;
+  f.attack.type = "";
+  f.attack.def = null;
+  f.attack.timer = 0;
+  f.attack.phase = "none";
+  f.attack.hasHit = false;
+  f.prevControls = { ...f.controls };
+}
+
+function getHurtbox(f) {
+  const w = 42;
+  const h = config.fighter.bodyHeight;
   return {
-    x: start.x,
-    y: start.y,
-    radius: config.sentinelRadius,
-    path,
-    pathIndex: 1 % path.length,
-    state: "patrol",
-    alertTimer: config.sentinelHoldTime,
-    vision,
+    x: f.x - w / 2,
+    y: f.y - h,
+    w,
+    h,
   };
 }
 
-function roundedRectPath(x, y, width, height, radius) {
-  const r = Math.min(radius, width / 2, height / 2);
+function getHitbox(f) {
+  const def = f.attack.def || config.attacks.punch;
+  const w = def.range;
+  const h = def.height;
+  const cx = f.x + f.facing * (config.fighter.radius + w * 0.55);
+  const cy = f.y - 54;
+  return {
+    x: cx - w / 2,
+    y: cy - h / 2,
+    w,
+    h,
+  };
+}
+
+function rectsOverlap(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function line(x1, y1, x2, y2) {
   ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + width - r, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-  ctx.lineTo(x + width, y + height - r);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-  ctx.lineTo(x + r, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+}
+
+function roundRect(x, y, w, h, r) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+  ctx.lineTo(x + radius, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
   ctx.closePath();
 }
 
-function circleRectIntersect(cx, cy, radius, rect) {
-  const closestX = clamp(cx, rect.x, rect.x + rect.width);
-  const closestY = clamp(cy, rect.y, rect.y + rect.height);
-  const dx = cx - closestX;
-  const dy = cy - closestY;
-  return dx * dx + dy * dy < radius * radius;
+function lerp(a, b, t) {
+  return a + (b - a) * clamp01(t);
 }
 
-function distance(a, b) {
-  const dx = (a.x - b.x) || 0;
-  const dy = (a.y - b.y) || 0;
-  return Math.hypot(dx, dy);
+function clamp01(v) {
+  return Math.min(1, Math.max(0, v));
 }
 
-function entityPosition(entity) {
-  return { x: entity.x, y: entity.y };
-}
-
-function randBetween(min, max) {
-  return Math.random() * (max - min) + min;
-}
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function saveBestScore(value) {
-  try {
-    localStorage.setItem(BEST_KEY, String(value));
-  } catch (error) {
-    console.error("Failed to save best score", error);
-  }
-}
-
-function loadBestScore() {
-  try {
-    const raw = localStorage.getItem(BEST_KEY);
-    const value = Number(raw);
-    return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
-  } catch (error) {
-    console.error("Failed to read best score", error);
-    return 0;
-  }
-}
