@@ -10,6 +10,7 @@ const ui = {
   p2: document.getElementById("p2-health-value"),
   round: document.getElementById("round-value"),
   timer: document.getElementById("timer-value"),
+  coins: document.getElementById("coins-value"),
   status: document.getElementById("status-text"),
   meterTrack: document.getElementById("meter-track"),
   meterFill: document.getElementById("meter-fill"),
@@ -89,12 +90,40 @@ const input = {
   p2: { left: false, right: false, jump: false, punch: false, kick: false, block: false },
 };
 
+const COIN_STORAGE_KEY = "stickmanBattle.coins";
+const WIN_COIN_REWARD = 50;
+
+function loadCoins() {
+  try {
+    const raw = localStorage.getItem(COIN_STORAGE_KEY);
+    const parsed = Number.parseInt(raw ?? "0", 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveCoins(coins) {
+  try {
+    localStorage.setItem(COIN_STORAGE_KEY, String(Math.max(0, Math.floor(coins))));
+  } catch {
+    // ignore (storage may be blocked)
+  }
+}
+
+function addCoins(amount) {
+  state.coins = Math.max(0, Math.floor(state.coins + amount));
+  saveCoins(state.coins);
+  updateUI();
+}
+
 const state = {
   phase: "idle", // idle | playing | over
   paused: true,
   round: 1,
   timeLeft: config.round.timeSeconds,
   winnerText: "",
+  coins: loadCoins(),
   lastTime: performance.now(),
   betweenRounds: 0,
   meter: 0, // 0..1 (shared "special meter" just for UI flair)
@@ -409,12 +438,22 @@ function endRound() {
   const p1Alive = p1.health > 0;
   const p2Alive = p2.health > 0;
 
-  if (p1Alive && !p2Alive) state.winnerText = "Player 1 wins!";
-  else if (!p1Alive && p2Alive) state.winnerText = "Player 2 wins!";
-  else if (p1.health === p2.health) state.winnerText = "Draw!";
-  else state.winnerText = p1.health > p2.health ? "Player 1 wins!" : "Player 2 wins!";
+  let winner = "draw"; // draw | p1 | p2
+  if (p1Alive && !p2Alive) winner = "p1";
+  else if (!p1Alive && p2Alive) winner = "p2";
+  else if (p1.health === p2.health) winner = "draw";
+  else winner = p1.health > p2.health ? "p1" : "p2";
 
-  setStatus(`${state.winnerText} Press Play (or R) to restart.`);
+  if (winner === "p1") state.winnerText = "Player 1 wins!";
+  else if (winner === "p2") state.winnerText = "Player 2 wins!";
+  else state.winnerText = "Draw!";
+
+  if (winner === "p1") {
+    addCoins(WIN_COIN_REWARD);
+    setStatus(`${state.winnerText} +${WIN_COIN_REWARD} coins (Total: ${state.coins}). Press Play (or R) to restart.`);
+  } else {
+    setStatus(`${state.winnerText} Press Play (or R) to restart.`);
+  }
   updateControls();
   updateUI();
 }
@@ -485,6 +524,7 @@ function updateUI() {
   if (ui.p2) ui.p2.textContent = String(Math.max(0, Math.floor(p2.health)));
   if (ui.round) ui.round.textContent = String(state.round);
   if (ui.timer) ui.timer.textContent = String(Math.max(0, Math.ceil(state.timeLeft)));
+  if (ui.coins) ui.coins.textContent = String(state.coins);
 
   if (ui.meterFill && ui.meterTrack && ui.meterText) {
     const percent = Math.round(clamp01(state.meter) * 100);
