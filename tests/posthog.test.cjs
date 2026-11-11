@@ -27,11 +27,12 @@ test('privacy features stay disabled even if project remote settings enable them
 });
 test('drops non-pageviews and strips secrets, form values, titles, identities and URL queries', () => {
   const { config } = load(); assert.equal(config.before_send({ event: '$autocapture' }), null);
-  const event = config.before_send({ event:'$pageview', properties: { distinct_id: 'anonymous-random', $current_url:'https://site.example/path?email=private@example.com#secret', $initial_current_url:'https://site.example/?token=secret', $set: { email:'secret' }, $title:'Private Name', email:'secret', form_value:'secret', utm_source:'secret' } });
+  const event = config.before_send({ event:'$pageview', properties: { token:'public-project-token', distinct_id: 'anonymous-random', $current_url:'https://site.example/path?email=private@example.com#secret', $initial_current_url:'https://site.example/?token=secret', $set: { email:'secret' }, $title:'Private Name', email:'secret', form_value:'secret', utm_source:'secret' } });
   assert.equal(event.properties.$current_url,'https://site.example/path');
   assert.equal(event.properties.$referrer,'https://ref.example');
   assert.equal(event.properties.$process_person_profile,false);
   assert.equal(event.properties.distinct_id,'anonymous-random');
+  assert.equal(event.properties.token,'public-project-token');
   assert.doesNotMatch(JSON.stringify(event),/secret|private@example|Private Name|form_value|utm_source/);
 });
 test('does not load on localhost, file URLs, DNT, GPC or an existing PostHog installation', () => {
