@@ -1,0 +1,4 @@
+
+
+# Local analytics build configuration (public token, not a personal API key).
+.env.posthog
